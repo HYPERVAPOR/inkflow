@@ -1,0 +1,71 @@
+{
+  "scenes": [
+    {
+      "scene_id": 1,
+      "subtitle": "清晨，阳光洒落在宁静的湖面上。",
+      "image_prompt": "日出时宁静的山间湖泊，金色阳光倒映在水面上",
+      "use_reference_image": false,
+      "reference_from": null,
+      "hold_image": false,
+      "duration_hint": 5,
+      "motion": {
+        "type": "ken_burns",
+        "start": "zoom_1.0_pan_0_0",
+        "end": "zoom_1.12_pan_0.02_0"
+      },
+      "voice": {
+        "voice_id": "zh-CN-YunxiNeural",
+        "speed": 1.0,
+        "emotion": "neutral"
+      }
+    },
+    {
+      "scene_id": 2,
+      "subtitle": "远处的山峦被薄雾轻轻笼罩。",
+      "image_prompt": "平静的湖泊被远处雾气弥漫的山峦环绕，晨雾",
+      "use_reference_image": true,
+      "reference_from": "prev",
+      "hold_image": false,
+      "duration_hint": 5,
+      "motion": {
+        "type": "ken_burns",
+        "start": "zoom_1.05_pan_-0.02_0",
+        "end": "zoom_1.15_pan_0.02_0"
+      },
+      "voice": {
+        "voice_id": "zh-CN-YunxiNeural",
+        "speed": 1.0,
+        "emotion": "neutral"
+      }
+    },
+    {
+      "scene_id": 3,
+      "subtitle": "一只小船静静地划过水面，留下细细的波纹。",
+      "image_prompt": "一艘小木船滑过湖面，水面上泛起细微波纹",
+      "use_reference_image": true,
+      "reference_from": "prev",
+      "hold_image": false,
+      "duration_hint": 6,
+      "motion": {
+        "type": "ken_burns",
+        "start": "zoom_1.0_pan_0_0",
+        "end": "zoom_1.1_pan_-0.03_0.01"
+      },
+      "voice": {
+        "voice_id": "zh-CN-YunxiNeural",
+        "speed": 1.0,
+        "emotion": "neutral"
+      }
+    }
+  ],
+  "metadata": {
+    "title": "宁静湖畔",
+    "target_duration": 20,
+    "resolution": "1080x1920",
+    "aspect_ratio": "9:16",
+    "fps": 24,
+    "style_prompt": "柔和粉彩色调，宫崎骏风格灵感，手绘背景，温暖光线，电影感构图",
+    "music_mood": "calm, inspiring",
+    "music_source": "stock"
+  }
+}

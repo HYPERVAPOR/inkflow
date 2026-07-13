@@ -1,0 +1,44 @@
+.env
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version
+dist/
+build/
+
+# OS / editor
+.DS_Store
+
+# User-specific agent directories
+.agents/
+.claude/
+
+# Skill lock file (user-local)
+skills-lock.json
+
+# Local reference docs / notes
+model-prices
+seedream-doc
+plan.md
+
+# Ignore all project directories except the example template
+projects/*/
+!projects/example-proj/
+
+# Project generated assets (also applied inside example-proj)
+projects/*/assets/images/*
+projects/*/assets/audio/*
+projects/*/assets/music/*
+projects/*/assets/subtitles/*
+projects/*/output/*
+projects/*/logs/*
+
+# Root legacy dirs (kept for backwards compatibility)
+assets/images/*
+assets/audio/*
+assets/music/*
+assets/subtitles/*
+output/*
+logs/*
