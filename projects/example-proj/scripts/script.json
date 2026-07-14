@@ -66,6 +66,11 @@
     "fps": 24,
     "style_prompt": "柔和粉彩色调，宫崎骏风格灵感，手绘背景，温暖光线，电影感构图",
     "music_mood": "calm, inspiring",
-    "music_source": "stock"
+    "music_source": "stock",
+    "tags": ["风景", "宁静", "湖畔", "治愈"],
+    "cover_image": {
+      "prompt": "宁静的湖面倒映着日出，远处山峦若隐若现",
+      "text": "这一刻，世界安静了"
+    }
   }
 }

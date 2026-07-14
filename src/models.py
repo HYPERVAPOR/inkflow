@@ -23,6 +23,13 @@ class Voice(BaseModel):
     emotion: str = "neutral"
 
 
+class CoverImage(BaseModel):
+    """Cover image configuration."""
+
+    prompt: str = ""
+    text: str = ""
+
+
 class Scene(BaseModel):
     """A single scene in the video."""
 
@@ -71,6 +78,8 @@ class Metadata(BaseModel):
     style_prompt: str = ""
     music_mood: str = "calm"
     music_source: Literal["stock", "ai"] = "stock"
+    tags: list[str] = Field(default_factory=list)
+    cover_image: CoverImage = Field(default_factory=CoverImage)
     subtitle_style: dict[str, str | int | float] = Field(default_factory=dict)
     burn_subtitles: bool = True
 

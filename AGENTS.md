@@ -135,6 +135,11 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
     "style_prompt": "手绘简约漫画风格，白色背景",
     "music_mood": "tense",
     "music_source": "stock",
+    "tags": ["标签1", "标签2"],
+    "cover_image": {
+      "prompt": "封面画面内容描述，与视频主题呼应，不写风格",
+      "text": "一句吸引点击的文案，不要和标题重复"
+    },
     "voice": { "voice_id": "zh-CN-YunxiNeural", "speed": 1.0, "emotion": "neutral" },
     "subtitle_style": {
       "FontName": "Noto Sans CJK SC",
@@ -183,10 +188,20 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 | `title` | 视频标题 |
 | `resolution` | 输出分辨率，如 `1920x1080` |
 | `aspect_ratio` | Seedance 比例参数，如 `16:9`、`9:16` |
+| `tags` | 视频标签数组，用于分类、检索和平台发布，如 `["自我提升", "习惯"]` |
+| `cover_image` | 封面图配置，`prompt` 用于生成 4:3 横封面，`text` 为叠加在封面上的文案（需与标题有差异） |
 | `voice` | 全局 TTS 配音配置，默认 `zh-CN-YunxiNeural` |
 | `video_model` | Seedance 模型名，默认 `doubao-seedance-1-0-pro-250528`；可在 `.env` 通过 `SEEDANCE_MODEL` 改新建脚本的默认值 |
 | `video_resolution` | **固定为 `720p`**，当前工作流不支持更高分辨率，用于控制成本 |
 | `video_watermark` | 是否带水印，默认 `false` |
+
+#### 封面图 `cover_image`
+
+- 用 Seedream 单独生成一张 **4:3 横封面**（1440x1080），风格和参考图与正片保持一致。
+- 从横封面中心裁剪出一张 **3:4 竖封面**。
+- 程序会在两张封面上居中叠加 `cover_image.text`，白字黑边，自动换行。
+- `text` 不要与 `title` 重复，建议写成引发好奇的短句。
+- 产物保存在项目 `assets/images/`：`cover_horizontal_text.png`、`cover_vertical_text.png`。
 
 ## 视频脚本编写准则
 

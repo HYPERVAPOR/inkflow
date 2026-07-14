@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import Config
 from .cost_tracker import CostTracker
+from .cover_generator import CoverGenerator
 from .image_generator import ImageGenerator
 from .models import Script
 from .script_loader import load_script, save_script
@@ -67,6 +68,11 @@ class Pipeline:
             with ShotFrameGenerator(self.config, cost_tracker) as frame_gen:
                 start_frame_map = frame_gen.generate(script)
 
+            # 3.5 Generate cover images
+            logger.info("Generating cover images...")
+            with CoverGenerator(self.config, cost_tracker) as cover_gen:
+                cover_gen.generate(script)
+
             # 4. Generate video clips from start frames
             logger.info("Step 4/5: Generating shot videos...")
             shot_durations = self._compute_shot_durations(script)
@@ -80,6 +86,11 @@ class Pipeline:
             logger.info("Step 3/5: Generating images...")
             with ImageGenerator(self.config, cost_tracker) as image_gen:
                 image_gen.generate(script)
+
+            # 3.5 Generate cover images
+            logger.info("Generating cover images...")
+            with CoverGenerator(self.config, cost_tracker) as cover_gen:
+                cover_gen.generate(script)
 
             # 4. No separate video generation step for legacy path
             logger.info("Step 4/5: Image generation complete")
