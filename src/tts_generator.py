@@ -111,7 +111,7 @@ class TTSGenerator:
         script: Script,
         output_path: Path,
     ) -> None:
-        """Generate a scene's audio using Volcano TTS v3."""
+        """Generate a scene's audio using the configured Volcano TTS endpoint."""
         voice = self._voice_for_scene(scene, script, "volcano")
         speed = self._speed_for_scene(scene, script)
         logger.info(
@@ -121,6 +121,103 @@ class TTSGenerator:
             speed,
         )
 
+        if "/api/v1/tts" in self.config.VOLCANO_TTS_BASE_URL:
+            await self._generate_volcano_v1(scene, script, output_path, voice, speed)
+        else:
+            await self._generate_volcano_v3(scene, script, output_path, voice, speed)
+
+    async def _generate_volcano_v1(
+        self,
+        scene: Scene,
+        script: Script,
+        output_path: Path,
+        voice: str,
+        speed: float,
+    ) -> None:
+        """Generate audio using the legacy Volcano TTS v1 HTTP endpoint."""
+        logger.info("Using Volcano TTS v1 endpoint for scene %s", scene.scene_id)
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer;{self.config.VOLCANO_TTS_ACCESS_TOKEN}",
+        }
+        payload = {
+            "app": {
+                "appid": self.config.VOLCANO_TTS_APP_ID,
+                "token": self.config.VOLCANO_TTS_ACCESS_TOKEN,
+                "cluster": self.config.VOLCANO_TTS_CLUSTER,
+            },
+            "user": {"uid": "inkflow"},
+            "audio": {
+                "voice_type": voice,
+                "encoding": "mp3",
+                "speed_ratio": speed,
+                "volume_ratio": 1.0,
+                "pitch_ratio": 1.0,
+            },
+            "request": {
+                "reqid": str(uuid.uuid4()),
+                "text": scene.subtitle,
+                "text_type": "plain",
+                "operation": "query",
+                "with_frontend": 1,
+            },
+        }
+
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+            response = await client.post(
+                self.config.VOLCANO_TTS_BASE_URL,
+                headers=headers,
+                json=payload,
+            )
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                raise RuntimeError(
+                    f"Volcano TTS v1 request failed: {exc.response.status_code} "
+                    f"{exc.response.text}"
+                ) from exc
+
+            try:
+                data = response.json()
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"Volcano TTS v1 returned non-JSON response: {response.text}"
+                ) from exc
+
+            code = data.get("code")
+            if code is not None and code != 0:
+                raise RuntimeError(
+                    f"Volcano TTS v1 returned error: {data.get('message')} (code={code})"
+                )
+
+            audio_b64 = data.get("data")
+            if not audio_b64:
+                raise RuntimeError(
+                    f"Volcano TTS v1 returned empty audio for scene {scene.scene_id}"
+                )
+
+            audio_bytes = base64.b64decode(audio_b64)
+
+        output_path.write_bytes(audio_bytes)
+        logger.info("Saved Volcano TTS v1 audio for scene %s", scene.scene_id)
+
+        if self.cost_tracker:
+            self.cost_tracker.log_tts(
+                model=f"volcano-tts-v1-{voice}",
+                text=scene.subtitle,
+                note=f"scene_id={scene.scene_id}, voice={voice}, speed={speed}",
+            )
+
+    async def _generate_volcano_v3(
+        self,
+        scene: Scene,
+        script: Script,
+        output_path: Path,
+        voice: str,
+        speed: float,
+    ) -> None:
+        """Generate audio using the Volcano TTS v3 unidirectional endpoint."""
         if self.config.VOLCANO_TTS_API_KEY:
             headers = {
                 "Content-Type": "application/json",
@@ -159,7 +256,7 @@ class TTSGenerator:
                 except httpx.HTTPStatusError as exc:
                     await exc.response.aread()
                     raise RuntimeError(
-                        f"Volcano TTS request failed: {exc.response.status_code} "
+                        f"Volcano TTS v3 request failed: {exc.response.status_code} "
                         f"{exc.response.text}"
                     ) from exc
 
@@ -176,7 +273,7 @@ class TTSGenerator:
                     code = data.get("code")
                     if code is not None and code != 0:
                         raise RuntimeError(
-                            f"Volcano TTS returned error: {data.get('message')} (code={code})"
+                            f"Volcano TTS v3 returned error: {data.get('message')} (code={code})"
                         )
 
                     chunk = data.get("data")
@@ -185,15 +282,15 @@ class TTSGenerator:
 
         if not audio_bytes:
             raise RuntimeError(
-                f"Volcano TTS returned empty audio for scene {scene.scene_id}"
+                f"Volcano TTS v3 returned empty audio for scene {scene.scene_id}"
             )
 
         output_path.write_bytes(audio_bytes)
-        logger.info("Saved Volcano TTS audio for scene %s", scene.scene_id)
+        logger.info("Saved Volcano TTS v3 audio for scene %s", scene.scene_id)
 
         if self.cost_tracker:
             self.cost_tracker.log_tts(
-                model=f"volcano-tts-{voice}",
+                model=f"volcano-tts-v3-{voice}",
                 text=scene.subtitle,
                 note=f"scene_id={scene.scene_id}, voice={voice}, speed={speed}",
             )

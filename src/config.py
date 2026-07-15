@@ -38,9 +38,10 @@ class Config:
     # Volcano TTS (Doubao / Seed-TTS)
     # New BytePlus Speech Console uses a single API key.
     VOLCANO_TTS_API_KEY: str = os.getenv("VOLCANO_TTS_API_KEY", "")
-    # Legacy Speech Console uses App ID + Access Token.
+    # Legacy Speech Console uses App ID + Access Token + Cluster.
     VOLCANO_TTS_APP_ID: str = os.getenv("VOLCANO_TTS_APP_ID", "")
     VOLCANO_TTS_ACCESS_TOKEN: str = os.getenv("VOLCANO_TTS_ACCESS_TOKEN", "")
+    VOLCANO_TTS_CLUSTER: str = os.getenv("VOLCANO_TTS_CLUSTER", "volcano_tts")
     VOLCANO_TTS_BASE_URL: str = os.getenv(
         "VOLCANO_TTS_BASE_URL", "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
     )

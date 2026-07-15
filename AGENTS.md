@@ -353,7 +353,7 @@ InkFlow 支持两种 TTS 后端，通过环境变量或 `script.json` 中的 `vo
 | Provider | 说明 | 配置项 |
 | -------- | ---- | ------ |
 | `edge_tts` | 免费、无需密钥，默认 | `TTS_VOICE`、`TTS_SPEED` |
-| `volcano` | 火山引擎豆包语音合成大模型 | `VOLCANO_TTS_API_KEY`（新版控制台）<br>或 `VOLCANO_TTS_APP_ID` + `VOLCANO_TTS_ACCESS_TOKEN`（旧版控制台）<br>`VOLCANO_TTS_VOICE`、`VOLCANO_TTS_RESOURCE_ID` |
+| `volcano` | 火山引擎豆包/Seed 语音合成 | `VOLCANO_TTS_API_KEY`（新版控制台，默认 v3）<br>或 `VOLCANO_TTS_APP_ID` + `VOLCANO_TTS_ACCESS_TOKEN` + `VOLCANO_TTS_CLUSTER`（旧版控制台，可切 v1）<br>`VOLCANO_TTS_BASE_URL`、`VOLCANO_TTS_VOICE`、`VOLCANO_TTS_RESOURCE_ID` |
 
 切换全局 provider：
 
@@ -361,12 +361,14 @@ InkFlow 支持两种 TTS 后端，通过环境变量或 `script.json` 中的 `vo
 # .env
 TTS_PROVIDER=volcano
 
-# 新版 BytePlus Speech Console 只用 API Key
+# 新版 BytePlus Speech Console：默认 v3 接口
 VOLCANO_TTS_API_KEY=your_api_key
 
-# 旧版 Speech Console 用 App ID + Access Token（二选一即可）
+# 旧版 Speech Console：切换到 v1 接口
+# VOLCANO_TTS_BASE_URL=https://openspeech.bytedance.com/api/v1/tts
 # VOLCANO_TTS_APP_ID=your_app_id
 # VOLCANO_TTS_ACCESS_TOKEN=your_access_token
+# VOLCANO_TTS_CLUSTER=volcano_tts
 
 VOLCANO_TTS_VOICE=zh_male_aojiaobazong_moon_bigtts
 ```
