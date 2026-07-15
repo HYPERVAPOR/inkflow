@@ -8,7 +8,7 @@ InkFlow 根据 `script.json` 自动生成画面、配音、字幕，输出 `outp
 
 - 画面首帧：Seedream（火山方舟）
 - 视频片段：Seedance（火山方舟）
-- TTS：Edge TTS（免费）
+- TTS：Edge TTS（免费，默认）/ 火山引擎 TTS（可选）
 - 合成：FFmpeg
 - 成本：每次运行写入 `logs/cost.json`
 
@@ -32,7 +32,7 @@ inkflow/
 │   │   ├── assets/
 │   │   │   ├── images/     # Seedream 生成的首帧图
 │   │   │   ├── videos/     # Seedance 生成的视频片段
-│   │   │   ├── audio/      # Edge TTS 生成的配音
+│   │   │   ├── audio/      # TTS 生成的配音
 │   │   │   ├── subtitles/  # SRT 字幕文件
 │   │   │   └── music/      # BGM
 │   │   ├── output/
@@ -61,7 +61,7 @@ inkflow/
 | `src/image_generator.py`      | Seedream 图片生成（legacy 流程） |
 | `src/shot_frame_generator.py` | Seedream 首帧图生成（shot 流程） |
 | `src/video_generator.py`      | Seedance 视频片段生成            |
-| `src/tts_generator.py`        | Edge TTS                         |
+| `src/tts_generator.py`        | TTS 生成（Edge TTS / 火山 TTS）              |
 | `src/subtitle_generator.py`   | SRT 字幕                         |
 | `src/video_assembler.py`      | FFmpeg 合成                      |
 | `src/pipeline.py`             | 流程编排                         |
@@ -169,7 +169,7 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 | `subtitle`      | 旁白/字幕文本                               |
 | `shot_id`       | 所属 shot，启用 shot 工作流时必填           |
 | `duration_hint` | 预估时长，TTS 失败时回退使用                |
-| `voice`         | 可选，单独覆盖 `metadata.voice` 的 TTS 配置 |
+| `voice`         | 可选，单独覆盖 `metadata.voice` 的 TTS 配置（`voice_id`、`speed`、`emotion`、`provider`） |
 
 #### Shot
 
@@ -191,7 +191,7 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 | `aspect_ratio`     | Seedance 比例参数，如 `16:9`、`9:16`                                                                         |
 | `tags`             | 视频标签数组，用于分类、检索和平台发布，如 `["自我提升", "习惯"]`                                            |
 | `cover_image`      | 封面图配置，`prompt` 用于生成 4:3 横封面，`text` 为叠加在封面上的文案（需与标题有差异）                      |
-| `voice`            | 全局 TTS 配音配置，默认 `zh-CN-YunxiNeural`                                                                  |
+| `voice`            | 全局 TTS 配音配置；默认 provider 为 `edge_tts`，可在 `.env` 切换为 `volcano` |
 | `video_model`      | Seedance 模型名，默认 `doubao-seedance-1-0-pro-250528`；可在 `.env` 通过 `SEEDANCE_MODEL` 改新建脚本的默认值 |
 | `video_resolution` | **固定为 `720p`**，当前工作流不支持更高分辨率，用于控制成本                                                  |
 | `video_watermark`  | 是否带水印，默认 `false`                                                                                     |
@@ -235,13 +235,27 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 - 知识/叙事类：横屏 `1920x1080`（16:9）。
 - 短平快/强情绪类：竖屏 `1080x1920`（9:16）。
 
-### 5. 脚本创作流程（分四步）
+### 5. 脚本创作流程（分四步 + 用户审阅）
 
 脚本不是一次性写成最终 `script.json`，而是分步完成，确保画面、运动与叙事上下文一致。完整流程与 shot 策略见 `docs/script-instruction.md` 第 6 章。
 
+**第零步：输出纯文本脚本供用户审阅（新增）**
+
+在写 `script.json` 之前，先交付一份只有台词文本的纯文本脚本：
+
+- 文件路径：`projects/<name>/scripts/script_text.md`
+- 内容只包含旁白/字幕文本，每句一行，不标注时间戳，不写 `start_frame_prompt` 或 `video_motion_prompt`。
+- 目标时长 2 分钟以上，信息密度高，钩子前置。
+- **必须等用户确认文本后，再继续下一步。**
+
+> **为什么这样做**：画面和运动提示词生成成本高、修改麻烦。如果台词本身方向不对，越早返工成本越低。纯文本审阅是防止"生成完才发现故事不对"的关键防线。
+
 **第一步：纯文本剧本**
 
-- 只写 `subtitle`（旁白/字幕），**不写 `start_frame_prompt` 或 `video_motion_prompt`**。
+用户确认 `script_text.md` 后，将其转换为 `script.json` 的 `scenes` 数组：
+
+- 每一句台词对应一个 `scene`。
+- 只填 `scene_id`、`subtitle`、`duration_hint`，**不写 `start_frame_prompt` 或 `video_motion_prompt`**。
 - 暂时不决定 shot 划分。
 
 **第二步：划分 shot**
@@ -331,6 +345,48 @@ uv run python main.py projects/<name> --step audio
 - `src/video_generator.py` 调用 Seedance API 时已传入 `"watermark": false`。
 - 无需后处理，生成即无水印。
 - 若某些模型仍返回水印，再考虑增加后处理。
+
+## TTS 配置
+
+InkFlow 支持两种 TTS 后端，通过环境变量或 `script.json` 中的 `voice.provider` 切换。
+
+| Provider | 说明 | 配置项 |
+| -------- | ---- | ------ |
+| `edge_tts` | 免费、无需密钥，默认 | `TTS_VOICE`、`TTS_SPEED` |
+| `volcano` | 火山引擎豆包语音合成大模型，需 App ID + Access Token | `VOLCANO_TTS_APP_ID`、`VOLCANO_TTS_ACCESS_TOKEN`、`VOLCANO_TTS_VOICE`、`VOLCANO_TTS_RESOURCE_ID` |
+
+切换全局 provider：
+
+```bash
+# .env
+TTS_PROVIDER=volcano
+VOLCANO_TTS_APP_ID=your_app_id
+VOLCANO_TTS_ACCESS_TOKEN=your_access_token
+VOLCANO_TTS_VOICE=zh_male_aojiaobazong_moon_bigtts
+```
+
+也可以在 `metadata.voice` 或单条 `scene.voice` 中指定 `provider: "volcano"`，实现混合使用。
+
+已验证的中文音色示例：
+
+- `zh_male_aojiaobazong_moon_bigtts`（傲娇霸总）
+- `zh_male_jingqiangkanye_moon_bigtts`（京腔侃爷）
+- `zh_male_wennuanahu_moon_bigtts`（温暖阿虎）
+- `zh_male_yangguangqingnian_moon_bigtts`（阳光青年）
+- `zh_female_sajiaonvyou_moon_bigtts`（撒娇女友）
+- `zh_female_gaolengyujie_moon_bigtts`（高冷御姐）
+- `zh_female_tianmeixiaoyuan_moon_bigtts`（甜美校园）
+- `zh_female_yuanqinvyou_moon_bigtts`（元气女友）
+- `zh_female_wanwanxiaohe_moon_bigtts`（弯弯小何）
+- `zh_female_linjianvhai_moon_bigtts`（邻家女孩）
+
+生成所有音色的试听样本：
+
+```bash
+PYTHONPATH=. uv run python scripts/generate_volcano_voice_samples.py
+```
+
+输出到 `output/volcano_voice_samples/`。
 
 ## 成本
 

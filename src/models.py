@@ -21,6 +21,7 @@ class Voice(BaseModel):
     voice_id: str | None = None
     speed: float = Field(default=1.2, ge=0.5, le=2.0)
     emotion: str = "neutral"
+    provider: Literal["edge_tts", "volcano"] | None = None
 
 
 class CoverImage(BaseModel):

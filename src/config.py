@@ -35,6 +35,15 @@ class Config:
     TTS_VOICE: str = os.getenv("TTS_VOICE", "zh-CN-YunjianNeural")
     TTS_SPEED: float = float(os.getenv("TTS_SPEED", "1.2"))
 
+    # Volcano TTS (Doubao / Seed-TTS)
+    VOLCANO_TTS_APP_ID: str = os.getenv("VOLCANO_TTS_APP_ID", "")
+    VOLCANO_TTS_ACCESS_TOKEN: str = os.getenv("VOLCANO_TTS_ACCESS_TOKEN", "")
+    VOLCANO_TTS_BASE_URL: str = os.getenv(
+        "VOLCANO_TTS_BASE_URL", "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
+    )
+    VOLCANO_TTS_RESOURCE_ID: str = os.getenv("VOLCANO_TTS_RESOURCE_ID", "volc.service_type.10029")
+    VOLCANO_TTS_VOICE: str = os.getenv("VOLCANO_TTS_VOICE", "zh_male_aojiaobazong_moon_bigtts")
+
     def __init__(self, project_dir: str | Path) -> None:
         self.project_dir = Path(project_dir)
 
@@ -69,5 +78,10 @@ class Config:
         """Validate required global configuration."""
         if not cls.ARK_API_KEY:
             raise ValueError("ARK_API_KEY is required for image generation")
-        if cls.TTS_PROVIDER != "edge_tts":
+        if cls.TTS_PROVIDER not in {"edge_tts", "volcano"}:
             raise ValueError(f"Unsupported TTS provider: {cls.TTS_PROVIDER}")
+        if cls.TTS_PROVIDER == "volcano":
+            if not cls.VOLCANO_TTS_APP_ID or not cls.VOLCANO_TTS_ACCESS_TOKEN:
+                raise ValueError(
+                    "VOLCANO_TTS_APP_ID and VOLCANO_TTS_ACCESS_TOKEN are required for volcano TTS"
+                )

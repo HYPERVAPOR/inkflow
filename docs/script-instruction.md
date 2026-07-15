@@ -162,13 +162,27 @@
 
 ---
 
-## 6. 脚本创作流程（分四步）
+## 6. 脚本创作流程（分四步 + 用户审阅）
 
 脚本不是一次性写成最终 `script.json`，而是分步完成，确保画面、运动与叙事上下文一致。
 
+**第零步：输出纯文本脚本供用户审阅（新增）**
+
+在写 `script.json` 之前，先交付一份只有台词文本的纯文本脚本：
+
+- 文件路径：`projects/<name>/scripts/script_text.md`
+- 内容只包含旁白/字幕文本，每句一行，不标注时间戳，不写 `start_frame_prompt` 或 `video_motion_prompt`。
+- 目标时长 2 分钟以上，信息密度高，钩子前置。
+- **必须等用户确认文本后，再继续下一步。**
+
+> **为什么这样做**：画面和运动提示词生成成本高、修改麻烦。如果台词本身方向不对，越早返工成本越低。纯文本审阅是防止"生成完才发现故事不对"的关键防线。
+
 **第一步：纯文本剧本**
 
-- 只写 `subtitle`（旁白/字幕），**不写 `start_frame_prompt` 或 `video_motion_prompt`**。
+用户确认 `script_text.md` 后，将其转换为 `script.json` 的 `scenes` 数组：
+
+- 每一句台词对应一个 `scene`。
+- 只填 `scene_id`、`subtitle`、`duration_hint`，**不写 `start_frame_prompt` 或 `video_motion_prompt`**。
 - 暂时不决定 shot 划分。
 
 **第二步：划分 shot**
