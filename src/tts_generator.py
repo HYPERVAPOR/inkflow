@@ -20,8 +20,26 @@ from .models import Scene, Script
 logger = logging.getLogger(__name__)
 
 
-# Verified Chinese voices for Volcano TTS v3 (seed-tts-2.0 / volc.service_type.10029).
-VOLCANO_VOICES: dict[str, str] = {
+# Verified Chinese voices for Volcano TTS.
+# v3 seed-tts-2.0 speakers must end with `_uranus_bigtts` (or `_saturn_bigtts`
+# for some accounts). v1 seed-tts-1.0 speakers must end with `_moon_bigtts`.
+VOLCANO_VOICES_V3: dict[str, str] = {
+    "zh_female_vv_uranus_bigtts": "Vivi 2.0",
+    "zh_female_cancan_uranus_bigtts": "知性灿灿 2.0",
+    "zh_female_sajiaoxuemei_uranus_bigtts": "撒娇学妹 2.0",
+    "zh_female_peiqi_uranus_bigtts": "佩奇猪 2.0",
+    "zh_female_wenroushunv_uranus_bigtts": "温柔淑女 2.0",
+    "zh_female_gufengshaoyu_uranus_bigtts": "古风少御 2.0",
+    "zh_female_wenjingmaomao_uranus_bigtts": "文静毛毛 2.0",
+    "zh_male_zhuangzhou_uranus_bigtts": "庄周 2.0",
+    "zh_male_kailangdidi_uranus_bigtts": "开朗弟弟 2.0",
+    "zh_male_fanjuanqingnian_uranus_bigtts": "反卷青年 2.0",
+    "zh_male_youyoujunzi_uranus_bigtts": "悠悠君子 2.0",
+    "zh_male_zhubajie_uranus_bigtts": "猪八戒 2.0",
+    "zh_male_sunwukong_uranus_bigtts": "猴哥 2.0",
+}
+
+VOLCANO_VOICES_V1: dict[str, str] = {
     "zh_female_sajiaonvyou_moon_bigtts": "撒娇女友",
     "zh_female_gaolengyujie_moon_bigtts": "高冷御姐",
     "zh_female_tianmeixiaoyuan_moon_bigtts": "甜美校园",
@@ -33,6 +51,9 @@ VOLCANO_VOICES: dict[str, str] = {
     "zh_male_wennuanahu_moon_bigtts": "温暖阿虎",
     "zh_male_yangguangqingnian_moon_bigtts": "阳光青年",
 }
+
+# Default voice list used by the sample generator.
+VOLCANO_VOICES = VOLCANO_VOICES_V3
 
 
 class TTSGenerator:
@@ -233,13 +254,20 @@ class TTSGenerator:
                 "X-Api-Resource-Id": self.config.VOLCANO_TTS_RESOURCE_ID,
                 "X-Api-Request-Id": str(uuid.uuid4()),
             }
+        # Map speed multiplier to Volcano v3 speech_rate: 1.0 -> 0, 1.2 -> 20,
+        # 0.5 -> -50, 2.0 -> 100. Clamp to [-50, 100].
+        speech_rate = int(round((speed - 1.0) * 100))
+        speech_rate = max(-50, min(100, speech_rate))
         payload = {
             "user": {"uid": "inkflow"},
             "req_params": {
                 "text": scene.subtitle,
                 "speaker": voice,
-                "speed_ratio": speed,
-                "audio_params": {"format": "mp3", "sample_rate": 24000},
+                "audio_params": {
+                    "format": "mp3",
+                    "sample_rate": 24000,
+                    "speech_rate": speech_rate,
+                },
             },
         }
 
@@ -271,7 +299,7 @@ class TTSGenerator:
                         continue
 
                     code = data.get("code")
-                    if code is not None and code != 0:
+                    if code is not None and str(code) not in {"0", "20000000"}:
                         raise RuntimeError(
                             f"Volcano TTS v3 returned error: {data.get('message')} (code={code})"
                         )

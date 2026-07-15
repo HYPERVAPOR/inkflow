@@ -19,9 +19,18 @@ from pathlib import Path
 
 from src.config import Config
 from src.models import Metadata, Scene, Script, Voice
-from src.tts_generator import VOLCANO_VOICES, TTSGenerator
+from src.tts_generator import VOLCANO_VOICES_V1, VOLCANO_VOICES_V3, TTSGenerator
 
 SAMPLE_TEXT = "你好，这是火山引擎语音合成大模型的音色试听。"
+
+
+def _voice_list(config: Config) -> dict[str, str]:
+    """Pick the right voice list for the configured Volcano endpoint/version."""
+    is_v1 = (
+        "/api/v1/tts" in config.VOLCANO_TTS_BASE_URL
+        or config.VOLCANO_TTS_RESOURCE_ID in {"seed-tts-1.0", "volc.service_type.10029"}
+    )
+    return VOLCANO_VOICES_V1 if is_v1 else VOLCANO_VOICES_V3
 
 
 async def generate_sample(generator: TTSGenerator, voice_id: str, output_path: Path) -> None:
@@ -55,7 +64,8 @@ async def main() -> None:
     output_dir = Path("output") / "volcano_voice_samples"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    for voice_id, description in VOLCANO_VOICES.items():
+    voices = _voice_list(config)
+    for voice_id, description in voices.items():
         output_path = output_dir / f"{voice_id}.mp3"
         if output_path.exists():
             print(f"Skipping existing: {voice_id} ({description})")

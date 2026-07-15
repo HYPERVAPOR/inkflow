@@ -375,18 +375,20 @@ VOLCANO_TTS_VOICE=zh_male_aojiaobazong_moon_bigtts
 
 也可以在 `metadata.voice` 或单条 `scene.voice` 中指定 `provider: "volcano"`，实现混合使用。
 
-已验证的中文音色示例：
+已验证的中文音色示例（v3 / `seed-tts-2.0`，后缀 `_uranus_bigtts`）：
 
-- `zh_male_aojiaobazong_moon_bigtts`（傲娇霸总）
-- `zh_male_jingqiangkanye_moon_bigtts`（京腔侃爷）
-- `zh_male_wennuanahu_moon_bigtts`（温暖阿虎）
-- `zh_male_yangguangqingnian_moon_bigtts`（阳光青年）
-- `zh_female_sajiaonvyou_moon_bigtts`（撒娇女友）
-- `zh_female_gaolengyujie_moon_bigtts`（高冷御姐）
-- `zh_female_tianmeixiaoyuan_moon_bigtts`（甜美校园）
-- `zh_female_yuanqinvyou_moon_bigtts`（元气女友）
-- `zh_female_wanwanxiaohe_moon_bigtts`（弯弯小何）
-- `zh_female_linjianvhai_moon_bigtts`（邻家女孩）
+- `zh_female_vv_uranus_bigtts`（Vivi 2.0）
+- `zh_female_cancan_uranus_bigtts`（知性灿灿 2.0）
+- `zh_female_sajiaoxuemei_uranus_bigtts`（撒娇学妹 2.0）
+- `zh_female_wenroushunv_uranus_bigtts`（温柔淑女 2.0）
+- `zh_female_gufengshaoyu_uranus_bigtts`（古风少御 2.0）
+- `zh_male_zhuangzhou_uranus_bigtts`（庄周 2.0）
+- `zh_male_kailangdidi_uranus_bigtts`（开朗弟弟 2.0）
+- `zh_male_fanjuanqingnian_uranus_bigtts`（反卷青年 2.0）
+- `zh_male_youyoujunzi_uranus_bigtts`（悠悠君子 2.0）
+- `zh_male_sunwukong_uranus_bigtts`（猴哥 2.0）
+
+若使用 v1（`volc.service_type.10029`），音色后缀需为 `_moon_bigtts`，例如 `zh_male_aojiaobazong_moon_bigtts`。
 
 生成所有音色的试听样本：
 
