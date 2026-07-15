@@ -157,6 +157,7 @@ class TTSGenerator:
                 try:
                     response.raise_for_status()
                 except httpx.HTTPStatusError as exc:
+                    await exc.response.aread()
                     raise RuntimeError(
                         f"Volcano TTS request failed: {exc.response.status_code} "
                         f"{exc.response.text}"

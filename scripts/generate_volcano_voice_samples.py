@@ -1,8 +1,11 @@
 """Generate short Volcano TTS samples for each supported voice.
 
 Usage:
+    export VOLCANO_TTS_API_KEY=...          # new console
+    # or
     export VOLCANO_TTS_APP_ID=...
-    export VOLCANO_TTS_ACCESS_TOKEN=...
+    export VOLCANO_TTS_ACCESS_TOKEN=...     # legacy console
+
     PYTHONPATH=. uv run python scripts/generate_volcano_voice_samples.py
 
 Outputs are written to output/volcano_voice_samples/.
@@ -38,9 +41,12 @@ async def main() -> None:
     config = Config(Path("projects") / "example-proj")
     config.ensure_dirs()
 
-    if not config.VOLCANO_TTS_APP_ID or not config.VOLCANO_TTS_ACCESS_TOKEN:
+    has_api_key = bool(config.VOLCANO_TTS_API_KEY)
+    has_legacy_creds = bool(config.VOLCANO_TTS_APP_ID) and bool(config.VOLCANO_TTS_ACCESS_TOKEN)
+    if not (has_api_key or has_legacy_creds):
         print(
-            "Error: VOLCANO_TTS_APP_ID and VOLCANO_TTS_ACCESS_TOKEN must be set",
+            "Error: set either VOLCANO_TTS_API_KEY (new console) "
+            "or both VOLCANO_TTS_APP_ID and VOLCANO_TTS_ACCESS_TOKEN (legacy console)",
             file=sys.stderr,
         )
         sys.exit(1)
