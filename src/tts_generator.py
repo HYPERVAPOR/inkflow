@@ -121,13 +121,21 @@ class TTSGenerator:
             speed,
         )
 
-        headers = {
-            "Content-Type": "application/json",
-            "X-Api-App-Id": self.config.VOLCANO_TTS_APP_ID,
-            "X-Api-Access-Key": self.config.VOLCANO_TTS_ACCESS_TOKEN,
-            "X-Api-Resource-Id": self.config.VOLCANO_TTS_RESOURCE_ID,
-            "X-Api-Request-Id": str(uuid.uuid4()),
-        }
+        if self.config.VOLCANO_TTS_API_KEY:
+            headers = {
+                "Content-Type": "application/json",
+                "X-Api-Key": self.config.VOLCANO_TTS_API_KEY,
+                "X-Api-Resource-Id": self.config.VOLCANO_TTS_RESOURCE_ID,
+                "X-Api-Request-Id": str(uuid.uuid4()),
+            }
+        else:
+            headers = {
+                "Content-Type": "application/json",
+                "X-Api-App-Id": self.config.VOLCANO_TTS_APP_ID,
+                "X-Api-Access-Key": self.config.VOLCANO_TTS_ACCESS_TOKEN,
+                "X-Api-Resource-Id": self.config.VOLCANO_TTS_RESOURCE_ID,
+                "X-Api-Request-Id": str(uuid.uuid4()),
+            }
         payload = {
             "user": {"uid": "inkflow"},
             "req_params": {

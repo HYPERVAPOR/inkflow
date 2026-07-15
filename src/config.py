@@ -36,6 +36,9 @@ class Config:
     TTS_SPEED: float = float(os.getenv("TTS_SPEED", "1.2"))
 
     # Volcano TTS (Doubao / Seed-TTS)
+    # New BytePlus Speech Console uses a single API key.
+    VOLCANO_TTS_API_KEY: str = os.getenv("VOLCANO_TTS_API_KEY", "")
+    # Legacy Speech Console uses App ID + Access Token.
     VOLCANO_TTS_APP_ID: str = os.getenv("VOLCANO_TTS_APP_ID", "")
     VOLCANO_TTS_ACCESS_TOKEN: str = os.getenv("VOLCANO_TTS_ACCESS_TOKEN", "")
     VOLCANO_TTS_BASE_URL: str = os.getenv(
@@ -81,7 +84,10 @@ class Config:
         if cls.TTS_PROVIDER not in {"edge_tts", "volcano"}:
             raise ValueError(f"Unsupported TTS provider: {cls.TTS_PROVIDER}")
         if cls.TTS_PROVIDER == "volcano":
-            if not cls.VOLCANO_TTS_APP_ID or not cls.VOLCANO_TTS_ACCESS_TOKEN:
+            has_api_key = bool(cls.VOLCANO_TTS_API_KEY)
+            has_legacy_creds = bool(cls.VOLCANO_TTS_APP_ID) and bool(cls.VOLCANO_TTS_ACCESS_TOKEN)
+            if not (has_api_key or has_legacy_creds):
                 raise ValueError(
-                    "VOLCANO_TTS_APP_ID and VOLCANO_TTS_ACCESS_TOKEN are required for volcano TTS"
+                    "Volcano TTS requires either VOLCANO_TTS_API_KEY (new console) "
+                    "or both VOLCANO_TTS_APP_ID and VOLCANO_TTS_ACCESS_TOKEN (legacy console)"
                 )

@@ -353,15 +353,21 @@ InkFlow 支持两种 TTS 后端，通过环境变量或 `script.json` 中的 `vo
 | Provider | 说明 | 配置项 |
 | -------- | ---- | ------ |
 | `edge_tts` | 免费、无需密钥，默认 | `TTS_VOICE`、`TTS_SPEED` |
-| `volcano` | 火山引擎豆包语音合成大模型，需 App ID + Access Token | `VOLCANO_TTS_APP_ID`、`VOLCANO_TTS_ACCESS_TOKEN`、`VOLCANO_TTS_VOICE`、`VOLCANO_TTS_RESOURCE_ID` |
+| `volcano` | 火山引擎豆包语音合成大模型 | `VOLCANO_TTS_API_KEY`（新版控制台）<br>或 `VOLCANO_TTS_APP_ID` + `VOLCANO_TTS_ACCESS_TOKEN`（旧版控制台）<br>`VOLCANO_TTS_VOICE`、`VOLCANO_TTS_RESOURCE_ID` |
 
 切换全局 provider：
 
 ```bash
 # .env
 TTS_PROVIDER=volcano
-VOLCANO_TTS_APP_ID=your_app_id
-VOLCANO_TTS_ACCESS_TOKEN=your_access_token
+
+# 新版 BytePlus Speech Console 只用 API Key
+VOLCANO_TTS_API_KEY=your_api_key
+
+# 旧版 Speech Console 用 App ID + Access Token（二选一即可）
+# VOLCANO_TTS_APP_ID=your_app_id
+# VOLCANO_TTS_ACCESS_TOKEN=your_access_token
+
 VOLCANO_TTS_VOICE=zh_male_aojiaobazong_moon_bigtts
 ```
 
