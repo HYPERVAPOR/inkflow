@@ -46,7 +46,7 @@ class Config:
         "VOLCANO_TTS_BASE_URL", "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
     )
     VOLCANO_TTS_RESOURCE_ID: str = os.getenv("VOLCANO_TTS_RESOURCE_ID", "seed-tts-2.0")
-    VOLCANO_TTS_VOICE: str = os.getenv("VOLCANO_TTS_VOICE", "zh_female_vv_uranus_bigtts")
+    VOLCANO_TTS_VOICE: str = os.getenv("VOLCANO_TTS_VOICE", "zh_male_dayi_uranus_bigtts")
 
     def __init__(self, project_dir: str | Path) -> None:
         self.project_dir = Path(project_dir)

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 # v3 seed-tts-2.0 speakers must end with `_uranus_bigtts` (or `_saturn_bigtts`
 # for some accounts). v1 seed-tts-1.0 speakers must end with `_moon_bigtts`.
 VOLCANO_VOICES_V3: dict[str, str] = {
+    "zh_male_dayi_uranus_bigtts": "大壹 2.0",
     "zh_female_vv_uranus_bigtts": "Vivi 2.0",
     "zh_female_cancan_uranus_bigtts": "知性灿灿 2.0",
     "zh_female_sajiaoxuemei_uranus_bigtts": "撒娇学妹 2.0",

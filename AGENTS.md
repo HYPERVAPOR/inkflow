@@ -377,6 +377,7 @@ VOLCANO_TTS_VOICE=zh_male_aojiaobazong_moon_bigtts
 
 已验证的中文音色示例（v3 / `seed-tts-2.0`，后缀 `_uranus_bigtts`）：
 
+- `zh_male_dayi_uranus_bigtts`（大壹 2.0）
 - `zh_female_vv_uranus_bigtts`（Vivi 2.0）
 - `zh_female_cancan_uranus_bigtts`（知性灿灿 2.0）
 - `zh_female_sajiaoxuemei_uranus_bigtts`（撒娇学妹 2.0）
