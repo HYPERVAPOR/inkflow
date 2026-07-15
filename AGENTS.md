@@ -54,18 +54,18 @@ inkflow/
 
 ## 核心文件
 
-| 文件 | 职责 |
-|------|------|
-| `src/config.py` | 环境变量与项目路径 |
-| `src/models.py` | `script.json` 数据模型 |
-| `src/image_generator.py` | Seedream 图片生成（legacy 流程） |
+| 文件                          | 职责                             |
+| ----------------------------- | -------------------------------- |
+| `src/config.py`               | 环境变量与项目路径               |
+| `src/models.py`               | `script.json` 数据模型           |
+| `src/image_generator.py`      | Seedream 图片生成（legacy 流程） |
 | `src/shot_frame_generator.py` | Seedream 首帧图生成（shot 流程） |
-| `src/video_generator.py` | Seedance 视频片段生成 |
-| `src/tts_generator.py` | Edge TTS |
-| `src/subtitle_generator.py` | SRT 字幕 |
-| `src/video_assembler.py` | FFmpeg 合成 |
-| `src/pipeline.py` | 流程编排 |
-| `src/cost_tracker.py` | 成本追踪 |
+| `src/video_generator.py`      | Seedance 视频片段生成            |
+| `src/tts_generator.py`        | Edge TTS                         |
+| `src/subtitle_generator.py`   | SRT 字幕                         |
+| `src/video_assembler.py`      | FFmpeg 合成                      |
+| `src/pipeline.py`             | 流程编排                         |
+| `src/cost_tracker.py`         | 成本追踪                         |
 
 ## 常用命令
 
@@ -153,7 +153,8 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
     "burn_subtitles": true,
     "video_model": "doubao-seedance-1-0-pro-250528",
     "video_resolution": "720p",
-    "video_watermark": false
+    "video_watermark": false,
+    "video_system_prompt": "传统手绘动画风格，拍二动画，低帧率，断奏动作，可见的铅笔纹理，粗线条艺术，逐帧美感"
   }
 }
 ```
@@ -162,38 +163,39 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 
 #### Scene
 
-| 字段 | 说明 |
-|------|------|
-| `scene_id` | 全局唯一序号 |
-| `subtitle` | 旁白/字幕文本 |
-| `shot_id` | 所属 shot，启用 shot 工作流时必填 |
-| `duration_hint` | 预估时长，TTS 失败时回退使用 |
-| `voice` | 可选，单独覆盖 `metadata.voice` 的 TTS 配置 |
+| 字段            | 说明                                        |
+| --------------- | ------------------------------------------- |
+| `scene_id`      | 全局唯一序号                                |
+| `subtitle`      | 旁白/字幕文本                               |
+| `shot_id`       | 所属 shot，启用 shot 工作流时必填           |
+| `duration_hint` | 预估时长，TTS 失败时回退使用                |
+| `voice`         | 可选，单独覆盖 `metadata.voice` 的 TTS 配置 |
 
 #### Shot
 
-| 字段 | 说明 |
-|------|------|
-| `shot_id` | 全局唯一序号 |
-| `start_frame_prompt` | Seedream 首帧图内容描述，只描述画面内容，不写风格 |
+| 字段                  | 说明                                                |
+| --------------------- | --------------------------------------------------- |
+| `shot_id`             | 全局唯一序号                                        |
+| `start_frame_prompt`  | Seedream 首帧图内容描述，只描述画面内容，不写风格   |
 | `video_motion_prompt` | Seedance 视频运动描述，描述镜头/主体/环境如何动起来 |
-| `use_reference_image` | 是否参考上一 shot 的首帧 |
-| `reference_from` | 参考来源， `"prev"` 或具体 `shot_id` |
-| `hold_video` | 复用上一 shot 的视频片段 |
+| `use_reference_image` | 是否参考上一 shot 的首帧                            |
+| `reference_from`      | 参考来源， `"prev"` 或具体 `shot_id`                |
+| `hold_video`          | 复用上一 shot 的视频片段                            |
 
 #### Metadata
 
-| 字段 | 说明 |
-|------|------|
-| `title` | 视频标题 |
-| `resolution` | 输出分辨率，如 `1920x1080` |
-| `aspect_ratio` | Seedance 比例参数，如 `16:9`、`9:16` |
-| `tags` | 视频标签数组，用于分类、检索和平台发布，如 `["自我提升", "习惯"]` |
-| `cover_image` | 封面图配置，`prompt` 用于生成 4:3 横封面，`text` 为叠加在封面上的文案（需与标题有差异） |
-| `voice` | 全局 TTS 配音配置，默认 `zh-CN-YunxiNeural` |
-| `video_model` | Seedance 模型名，默认 `doubao-seedance-1-0-pro-250528`；可在 `.env` 通过 `SEEDANCE_MODEL` 改新建脚本的默认值 |
-| `video_resolution` | **固定为 `720p`**，当前工作流不支持更高分辨率，用于控制成本 |
-| `video_watermark` | 是否带水印，默认 `false` |
+| 字段               | 说明                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `title`            | 视频标题                                                                                                     |
+| `resolution`       | 输出分辨率，如 `1920x1080`                                                                                   |
+| `aspect_ratio`     | Seedance 比例参数，如 `16:9`、`9:16`                                                                         |
+| `tags`             | 视频标签数组，用于分类、检索和平台发布，如 `["自我提升", "习惯"]`                                            |
+| `cover_image`      | 封面图配置，`prompt` 用于生成 4:3 横封面，`text` 为叠加在封面上的文案（需与标题有差异）                      |
+| `voice`            | 全局 TTS 配音配置，默认 `zh-CN-YunxiNeural`                                                                  |
+| `video_model`      | Seedance 模型名，默认 `doubao-seedance-1-0-pro-250528`；可在 `.env` 通过 `SEEDANCE_MODEL` 改新建脚本的默认值 |
+| `video_resolution` | **固定为 `720p`**，当前工作流不支持更高分辨率，用于控制成本                                                  |
+| `video_watermark`  | 是否带水印，默认 `false`                                                                                     |
+| `video_system_prompt` | 系统级视频风格提示词，自动追加到每条 `start_frame_prompt`、`video_motion_prompt`、封面图和 legacy `image_prompt` 前面，用于统一全片动画风格 |
 
 #### 封面图 `cover_image`
 
@@ -205,10 +207,14 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 
 ## 视频脚本编写准则
 
+核心原则与详细范本见 [`docs/script-instruction.md`](docs/script-instruction.md)。下面是快速要点：
+
 ### 1. 时长与钩子
 
 - 目标时长：≥2 分钟，信息密度高。
-- **黄金 3 秒**：第一句必须抛钩子，激发好奇心，吊胃口
+- **黄金 3 秒**：第一句必须抛钩子，激发好奇心，吊胃口。
+- 常用钩子方向：反常识冲突、反直觉提问、第二人称假设、悖论式答案、痛点共鸣、悬念预告。
+- 详细范本（含《一面镜子》《火车撞你》《变成霸王龙》《老一辈怕笑话》四个案例）见 `docs/script-instruction.md` 第 2 章。
 
 ### 2. 字幕与台词
 
@@ -231,7 +237,7 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 
 ### 5. 脚本创作流程（分四步）
 
-脚本不是一次性写成最终 `script.json`，而是分步完成，确保画面、运动与叙事上下文一致。
+脚本不是一次性写成最终 `script.json`，而是分步完成，确保画面、运动与叙事上下文一致。完整流程与 shot 策略见 `docs/script-instruction.md` 第 6 章。
 
 **第一步：纯文本剧本**
 
@@ -266,21 +272,21 @@ uv run python main.py projects/<name> --step audio
 
 确认 shot 分组和时长都 OK 后，再补全 `start_frame_prompt` 和 `video_motion_prompt`：
 
-| 策略 | 字段 | 说明 |
-|------|------|------|
-| **复用视频片段** | `hold_video: true` | 当前 shot 与上一 shot 画面几乎不变，只换台词，复用同一段视频。 |
-| **全新 shot** | `use_reference_image: false`, `hold_video: false` | 需要全新的视觉意象。 |
-| **图生图参考** | `use_reference_image: true`, `reference_from: "prev"` | 当前 shot 与上一 shot 在视觉上有**关联性或连续性**，例如同一人物换表情、同一场景加物件、同一空间换机位。参考指令要明确写出变化，如"给这张图片增加一个穿白大褂的男人"、"让这个人露出开心的表情"。 |
+| 策略             | 字段                                                  | 说明                                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **复用视频片段** | `hold_video: true`                                    | 当前 shot 与上一 shot 画面几乎不变，只换台词，复用同一段视频。                                                                                                                                   |
+| **全新 shot**    | `use_reference_image: false`, `hold_video: false`     | 需要全新的视觉意象。                                                                                                                                                                             |
+| **图生图参考**   | `use_reference_image: true`, `reference_from: "prev"` | 当前 shot 与上一 shot 在视觉上有**关联性或连续性**，例如同一人物换表情、同一场景加物件、同一空间换机位。参考指令要明确写出变化，如"给这张图片增加一个穿白大褂的男人"、"让这个人露出开心的表情"。 |
 
 判断 shot 策略时要考虑前后 2-3 句的上下文，避免同一人物或场景被反复切镜头。
 
 ### 6. 画面提示词语言与内容
 
+完整规范见 `docs/script-instruction.md` 第 7 章。
+
 #### 语言
 
-- 所有 `start_frame_prompt` 和 `video_motion_prompt` 必须**用中文撰写**，不得使用英文。
-- `style_prompt` 同样使用中文描述。
-- 即使先想到英文表达，也必须翻译成中文后再写入 `script.json`。
+- 所有 `start_frame_prompt` 和 `video_motion_prompt` 默认**用中文撰写**，如果用户要求，则使用英文。
 
 #### 内容
 
@@ -310,10 +316,10 @@ uv run python main.py projects/<name> --step audio
 
 根据 Seedance 官方文档：
 
-| 限制项 | 上限 |
-|--------|------|
-| 最大并发数 | 10 |
-| 最大 RPM | 600 |
+| 限制项     | 上限 |
+| ---------- | ---- |
+| 最大并发数 | 10   |
+| 最大 RPM   | 600  |
 
 - 并发数通过环境变量 `SEEDANCE_MAX_WORKERS` 配置，默认 `10`。
 - 超过 10 个任务会进入排队状态，不会失败。
@@ -330,8 +336,8 @@ uv run python main.py projects/<name> --step audio
 
 ### Seedream 首帧图
 
-| 分辨率 | 价格 |
-|--------|------|
+| 分辨率       | 价格       |
+| ------------ | ---------- |
 | ≤ 236 万像素 | 0.30 元/张 |
 | > 236 万像素 | 0.60 元/张 |
 
@@ -340,7 +346,7 @@ uv run python main.py projects/<name> --step audio
 当前工作流**只使用 720p** 以控制成本。以 `doubao-seedance-1-0-pro-250528` 估算：
 
 | 分辨率 | 约 5 秒价格 | 约每秒价格 |
-|--------|-------------|------------|
+| ------ | ----------- | ---------- |
 | 720p   | 0.86 元     | 0.172 元   |
 
 实际成本优先以 API 返回的 `completion_tokens` 为准；否则按 720p × 时长估算。

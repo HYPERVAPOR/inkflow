@@ -65,6 +65,7 @@
     "aspect_ratio": "9:16",
     "fps": 24,
     "style_prompt": "柔和粉彩色调，宫崎骏风格灵感，手绘背景，温暖光线，电影感构图",
+    "video_system_prompt": "传统手绘动画风格，拍二动画，低帧率，断奏动作，可见的铅笔纹理，粗线条艺术，逐帧美感",
     "music_mood": "calm, inspiring",
     "music_source": "stock",
     "tags": ["风景", "宁静", "湖畔", "治愈"],

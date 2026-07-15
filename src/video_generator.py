@@ -211,6 +211,10 @@ class VideoGenerator:
         ratio = metadata.aspect_ratio
         resolution = metadata.video_resolution
 
+        prompt = shot.video_motion_prompt
+        if metadata.video_system_prompt:
+            prompt = f"{metadata.video_system_prompt}，{prompt}"
+
         config = VideoGenerationConfig(
             first_frame=_image_to_data_url(start_frame_path),
             ratio=ratio,
@@ -228,7 +232,7 @@ class VideoGenerator:
             resolution,
         )
 
-        task_data = await self._create_task(shot.video_motion_prompt, config, model_name)
+        task_data = await self._create_task(prompt, config, model_name)
         task_id = task_data.get("id")
         if not task_id:
             raise ValueError(f"Failed to create video task for shot {shot.shot_id}: {task_data}")

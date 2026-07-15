@@ -91,6 +91,10 @@ class Metadata(BaseModel):
     video_model: str = "doubao-seedance-1-5-pro-251215"
     video_resolution: Literal["720p"] = "720p"
     video_watermark: bool = False
+    # System-level prompt prepended to every video-related prompt (start frame,
+    # video motion, legacy image prompt, and cover image). Use this to enforce a
+    # unified animation style across the whole video.
+    video_system_prompt: str = ""
 
 
 class Script(BaseModel):

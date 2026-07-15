@@ -79,10 +79,17 @@ class CoverGenerator:
         )
 
     def _build_prompt(self, metadata: Metadata) -> str:
-        """Combine style prompt with cover-specific content prompt."""
+        """Combine style prompt with cover-specific content prompt.
+
+        The optional metadata.video_system_prompt is prepended so the cover
+        matches the animation system used in the main video.
+        """
         cover_prompt = metadata.cover_image.prompt
         style = metadata.style_prompt
-        return f"与参考图画风保持一致，{style}，{cover_prompt}".strip("，")
+        content = cover_prompt
+        if metadata.video_system_prompt:
+            content = f"{metadata.video_system_prompt}，{content}"
+        return f"与参考图画风保持一致，{style}，{content}".strip("，")
 
     def _generate_horizontal(
         self,

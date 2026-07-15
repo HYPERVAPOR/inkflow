@@ -32,13 +32,20 @@ class ShotFrameGenerator:
         )
 
     def build_prompt(self, shot: Shot, metadata: Metadata, uses_prev: bool = False) -> str:
-        """Combine global style prompt with shot-specific start-frame prompt."""
+        """Combine global style prompt with shot-specific start-frame prompt.
+
+        The optional metadata.video_system_prompt is prepended to the content
+        prompt so every shot shares the same animation-system directive.
+        """
         if uses_prev:
             prefix = "保持图1的画风，在图2的基础上"
         else:
             prefix = "与图1的画风保持一致"
-        parts = [prefix, metadata.style_prompt, shot.start_frame_prompt]
-        return ", ".join(p for p in parts if p)
+        content = shot.start_frame_prompt
+        if metadata.video_system_prompt:
+            content = f"{metadata.video_system_prompt}，{content}"
+        parts = [prefix, metadata.style_prompt, content]
+        return "，".join(p for p in parts if p)
 
     def _parse_resolution(self, resolution: str) -> tuple[int, int]:
         """Parse WIDTHxHEIGHT from metadata resolution."""
