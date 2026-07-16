@@ -11,11 +11,11 @@ from pathlib import Path
 
 import edge_tts
 import httpx
+from inkflow_core.config import Config
+from inkflow_core.models import Scene, Script
 from pydub import AudioSegment  # type: ignore[import-untyped]
 
-from .config import Config
-from .cost_tracker import CostTracker
-from .models import Scene, Script
+from inkflow_generators.cost import CostTracker
 
 logger = logging.getLogger(__name__)
 

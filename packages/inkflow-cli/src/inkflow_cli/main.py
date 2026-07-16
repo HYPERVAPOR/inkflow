@@ -6,8 +6,8 @@ import argparse
 import logging
 from pathlib import Path
 
-from src.config import Config
-from src.pipeline import Pipeline
+from inkflow_core.config import Config
+from inkflow_workflows.pipeline import Pipeline
 
 
 def setup_logging(logs_dir: Path) -> None:

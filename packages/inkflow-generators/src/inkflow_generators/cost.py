@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .config import Config
+from inkflow_core.config import Config
 
 logger = logging.getLogger(__name__)
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .config import Config
-from .models import Scene, Script
+from inkflow_core.config import Config
+from inkflow_core.models import Scene, Script
 
 
 def _format_srt_time(seconds: float) -> str:

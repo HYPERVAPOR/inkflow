@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from inkflow_core.config import Config
+from inkflow_core.models import Metadata, Script, Shot
 
-from .config import Config
-from .cost_tracker import CostTracker
-from .models import Metadata, Script, Shot
+from inkflow_generators.cost import CostTracker
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +248,9 @@ class ShotFrameGenerator:
             chain = [root_id]
             current = root_id
             while True:
-                next_nodes = [c for c in children_of.get(current, []) if parent_of.get(c) == current]
+                next_nodes = [
+                    c for c in children_of.get(current, []) if parent_of.get(c) == current
+                ]
                 if not next_nodes:
                     break
                 # Continue along the first child (scripts typically use prev chains)
@@ -280,7 +282,9 @@ class ShotFrameGenerator:
                         path = future.result()
                         reference_map[shot.shot_id] = path
                     except Exception as e:
-                        logger.error("Failed to generate start frame for shot %s: %s", shot.shot_id, e)
+                        logger.error(
+                            "Failed to generate start frame for shot %s: %s", shot.shot_id, e
+                        )
                         raise
 
         # 2. Generate each dependency chain concurrently; within a chain sequentially
@@ -312,7 +316,9 @@ class ShotFrameGenerator:
             prev_path = reference_map.get(shot.shot_id - 1)
             if prev_path and prev_path.exists():
                 reference_map[shot.shot_id] = prev_path
-                logger.info("Shot %s holds start frame from shot %s", shot.shot_id, shot.shot_id - 1)
+                logger.info(
+                    "Shot %s holds start frame from shot %s", shot.shot_id, shot.shot_id - 1
+                )
             else:
                 logger.warning(
                     "Could not hold start frame for shot %s, previous frame not found",

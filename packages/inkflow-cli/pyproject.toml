@@ -1,42 +1,31 @@
 [project]
-name = "inkflow"
+name = "inkflow-cli"
 version = "0.2.0"
-description = "AI video generation workflow"
-readme = "README.md"
+description = "CLI entry point for InkFlow"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [
-    { name = "Your Name", email = "your.email@example.com" },
-]
 dependencies = [
     "inkflow-core",
     "inkflow-generators",
     "inkflow-workflows",
     "inkflow-assembly",
-    "inkflow-remotion",
-    "inkflow-cli",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "ruff>=0.5.0",
-    "mypy>=1.10.0",
-]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[project.scripts]
-inkflow = "inkflow_cli.main:main"
-
-[tool.uv.workspace]
-members = ["packages/*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/inkflow_cli"]
 
 [tool.uv.sources]
 inkflow-core = { workspace = true }
 inkflow-generators = { workspace = true }
 inkflow-workflows = { workspace = true }
 inkflow-assembly = { workspace = true }
-inkflow-remotion = { workspace = true }
-inkflow-cli = { workspace = true }
+
+[project.scripts]
+inkflow = "inkflow_cli.main:main"
 
 [tool.ruff]
 line-length = 100

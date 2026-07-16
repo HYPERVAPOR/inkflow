@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from inkflow_core.config import Config
+from inkflow_core.models import Metadata, Scene, Script
 
-from .config import Config
-from .cost_tracker import CostTracker
-from .models import Metadata, Scene, Script
+from inkflow_generators.cost import CostTracker
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,8 @@ class ImageGenerator:
             if "url" in image_item:
                 return httpx.get(image_item["url"], timeout=60.0).content, usage
 
-        raise ValueError(f"Unexpected response format: {json.dumps(data, ensure_ascii=False)[:200]}")
+        preview = json.dumps(data, ensure_ascii=False)[:200]
+        raise ValueError(f"Unexpected response format: {preview}")
 
     def _generate_one(
         self, scene: Scene, metadata: Metadata, output_dir: Path, reference_map: dict[int, Path]
@@ -158,7 +159,12 @@ class ImageGenerator:
                     )
                 return output_path
             except Exception as e:
-                logger.error("Image generation failed for scene %s (attempt %s): %s", scene.scene_id, attempt + 1, e)
+                logger.error(
+                    "Image generation failed for scene %s (attempt %s): %s",
+                    scene.scene_id,
+                    attempt + 1,
+                    e,
+                )
                 time.sleep(2 ** attempt)
 
         # Fallback: create a placeholder image
@@ -241,7 +247,9 @@ class ImageGenerator:
             prev_path = reference_map.get(scene.scene_id - 1)
             if prev_path and prev_path.exists():
                 reference_map[scene.scene_id] = prev_path
-                logger.info("Scene %s holds image from scene %s", scene.scene_id, scene.scene_id - 1)
+                logger.info(
+                    "Scene %s holds image from scene %s", scene.scene_id, scene.scene_id - 1
+                )
             else:
                 logger.warning(
                     "Could not hold image for scene %s, previous image not found",

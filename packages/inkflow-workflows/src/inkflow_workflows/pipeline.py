@@ -6,17 +6,17 @@ import asyncio
 import logging
 from pathlib import Path
 
-from .config import Config
-from .cost_tracker import CostTracker
-from .cover_generator import CoverGenerator
-from .image_generator import ImageGenerator
-from .models import Script, Shot
-from .script_loader import load_script, save_script
-from .shot_frame_generator import ShotFrameGenerator
-from .subtitle_generator import SubtitleGenerator
-from .tts_generator import TTSGenerator
-from .video_assembler import VideoAssembler
-from .video_generator import VideoGenerator
+from inkflow_assembly.assembler import VideoAssembler
+from inkflow_core.config import Config
+from inkflow_core.models import Script, Shot
+from inkflow_core.script_loader import load_script, save_script
+from inkflow_generators.cost import CostTracker
+from inkflow_generators.cover import CoverGenerator
+from inkflow_generators.image.seedream import ImageGenerator
+from inkflow_generators.image.shot_frame import ShotFrameGenerator
+from inkflow_generators.subtitle import SubtitleGenerator
+from inkflow_generators.tts.generator import TTSGenerator
+from inkflow_generators.video.seedance import VideoGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,8 @@ class Pipeline:
         for shot in script.shots:
             scenes = script.scenes_for_shot(shot)
             total = sum(s.actual_duration or s.duration_hint or 3.0 for s in scenes)
-            durations[shot.shot_id] = min(max(int(total) + (1 if total % 1 > 0 else 0), 1), max_duration)
+            rounded = int(total) + (1 if total % 1 > 0 else 0)
+            durations[shot.shot_id] = min(max(rounded, 1), max_duration)
         return durations
 
     def _build_last_frame_map(
@@ -52,7 +53,6 @@ class Pipeline:
         """
         last_frame_map: dict[int, Path] = {}
         sorted_shots = sorted(script.shots, key=lambda s: s.shot_id)
-        shot_by_id = {s.shot_id: s for s in sorted_shots}
 
         for i, shot in enumerate(sorted_shots):
             if not shot.transition_to_next:
@@ -187,7 +187,9 @@ class Pipeline:
                 shot_durations = self._compute_shot_durations(script)
                 last_frame_map = self._build_last_frame_map(script, start_frame_map)
                 video_gen = VideoGenerator(self.config, cost_tracker)
-                asyncio.run(video_gen.generate(script, start_frame_map, shot_durations, last_frame_map))
+                asyncio.run(
+                    video_gen.generate(script, start_frame_map, shot_durations, last_frame_map)
+                )
             subtitle_gen = SubtitleGenerator(self.config)
             subtitle_path = subtitle_gen.generate(script)
             VideoAssembler(self.config).assemble(script, subtitle_path)

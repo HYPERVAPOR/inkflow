@@ -9,8 +9,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .config import Config
-from .models import Scene, Script, Shot
+from inkflow_core.config import Config
+from inkflow_core.models import Scene, Script, Shot
 
 logger = logging.getLogger(__name__)
 
@@ -109,9 +109,13 @@ class VideoAssembler:
         ]
         self._run_ffmpeg(args)
 
-    def _concat_files(self, file_paths: list[Path], output_path: Path, file_type: str = "video") -> None:
+    def _concat_files(
+        self, file_paths: list[Path], output_path: Path, file_type: str = "video"
+    ) -> None:
         """Concatenate media files using FFmpeg concat demuxer."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             for path in file_paths:
                 f.write(f"file '{path.resolve()}'\n")
             concat_list = f.name

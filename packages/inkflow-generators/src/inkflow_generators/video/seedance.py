@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import httpx
+from inkflow_core.config import Config
+from inkflow_core.models import Metadata, Script, Shot
 
-from .config import Config
-from .cost_tracker import CostTracker
-from .models import Metadata, Script, Shot
+from inkflow_generators.cost import CostTracker
 
 logger = logging.getLogger(__name__)
 

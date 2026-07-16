@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from inkflow_core.config import Config
+from inkflow_core.models import Metadata, Script
 from PIL import Image, ImageDraw, ImageFont
 
-from .config import Config
-from .cost_tracker import CostTracker
-from .models import Metadata, Script
+from inkflow_generators.cost import CostTracker
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +214,6 @@ class CoverGenerator:
             for i, line in enumerate(lines):
                 bbox = draw.textbbox((0, 0), line, font=font)
                 line_width = bbox[2] - bbox[0]
-                line_height = line_heights[i]
                 x = (width - line_width) // 2
                 y = start_y + sum(line_heights[:i]) + line_spacing * i
 

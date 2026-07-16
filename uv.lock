@@ -7,6 +7,17 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 
+[manifest]
+members = [
+    "inkflow",
+    "inkflow-assembly",
+    "inkflow-cli",
+    "inkflow-core",
+    "inkflow-generators",
+    "inkflow-remotion",
+    "inkflow-workflows",
+]
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.7.1"
@@ -527,16 +538,15 @@ wheels = [
 
 [[package]]
 name = "inkflow"
-version = "0.1.0"
-source = { editable = "." }
+version = "0.2.0"
+source = { virtual = "." }
 dependencies = [
-    { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
-    { name = "edge-tts" },
-    { name = "httpx" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "pydub" },
-    { name = "python-dotenv" },
+    { name = "inkflow-assembly" },
+    { name = "inkflow-cli" },
+    { name = "inkflow-core" },
+    { name = "inkflow-generators" },
+    { name = "inkflow-remotion" },
+    { name = "inkflow-workflows" },
 ]
 
 [package.optional-dependencies]
@@ -548,18 +558,115 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "audioop-lts", marker = "python_full_version >= '3.13'", specifier = ">=0.2.1" },
-    { name = "edge-tts", specifier = ">=6.1.0" },
-    { name = "httpx", specifier = ">=0.25.0" },
+    { name = "inkflow-assembly", editable = "packages/inkflow-assembly" },
+    { name = "inkflow-cli", editable = "packages/inkflow-cli" },
+    { name = "inkflow-core", editable = "packages/inkflow-core" },
+    { name = "inkflow-generators", editable = "packages/inkflow-generators" },
+    { name = "inkflow-remotion", editable = "packages/inkflow-remotion" },
+    { name = "inkflow-workflows", editable = "packages/inkflow-workflows" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
-    { name = "pillow", specifier = ">=10.0.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pydub", specifier = ">=0.25.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5.0" },
 ]
 provides-extras = ["dev"]
+
+[[package]]
+name = "inkflow-assembly"
+version = "0.2.0"
+source = { editable = "packages/inkflow-assembly" }
+dependencies = [
+    { name = "inkflow-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "inkflow-core", editable = "packages/inkflow-core" }]
+
+[[package]]
+name = "inkflow-cli"
+version = "0.2.0"
+source = { editable = "packages/inkflow-cli" }
+dependencies = [
+    { name = "inkflow-assembly" },
+    { name = "inkflow-core" },
+    { name = "inkflow-generators" },
+    { name = "inkflow-workflows" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "inkflow-assembly", editable = "packages/inkflow-assembly" },
+    { name = "inkflow-core", editable = "packages/inkflow-core" },
+    { name = "inkflow-generators", editable = "packages/inkflow-generators" },
+    { name = "inkflow-workflows", editable = "packages/inkflow-workflows" },
+]
+
+[[package]]
+name = "inkflow-core"
+version = "0.2.0"
+source = { editable = "packages/inkflow-core" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+]
+
+[[package]]
+name = "inkflow-generators"
+version = "0.2.0"
+source = { editable = "packages/inkflow-generators" }
+dependencies = [
+    { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
+    { name = "edge-tts" },
+    { name = "httpx" },
+    { name = "inkflow-core" },
+    { name = "pillow" },
+    { name = "pydub" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "audioop-lts", marker = "python_full_version >= '3.13'", specifier = ">=0.2.1" },
+    { name = "edge-tts", specifier = ">=6.1.0" },
+    { name = "httpx", specifier = ">=0.25.0" },
+    { name = "inkflow-core", editable = "packages/inkflow-core" },
+    { name = "pillow", specifier = ">=10.0.0" },
+    { name = "pydub", specifier = ">=0.25.1" },
+]
+
+[[package]]
+name = "inkflow-remotion"
+version = "0.2.0"
+source = { editable = "packages/inkflow-remotion" }
+dependencies = [
+    { name = "inkflow-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "inkflow-core", editable = "packages/inkflow-core" }]
+
+[[package]]
+name = "inkflow-workflows"
+version = "0.2.0"
+source = { editable = "packages/inkflow-workflows" }
+dependencies = [
+    { name = "inkflow-assembly" },
+    { name = "inkflow-core" },
+    { name = "inkflow-generators" },
+    { name = "inkflow-remotion" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "inkflow-assembly", editable = "packages/inkflow-assembly" },
+    { name = "inkflow-core", editable = "packages/inkflow-core" },
+    { name = "inkflow-generators", editable = "packages/inkflow-generators" },
+    { name = "inkflow-remotion", editable = "packages/inkflow-remotion" },
+]
 
 [[package]]
 name = "librt"
