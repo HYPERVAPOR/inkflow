@@ -35,6 +35,12 @@ class Config:
     TTS_VOICE: str = os.getenv("TTS_VOICE", "zh-CN-YunjianNeural")
     TTS_SPEED: float = float(os.getenv("TTS_SPEED", "1.2"))
 
+    # Remotion (dynamic infographic workflow)
+    REMOTION_DIR: Path = Path(
+        os.getenv("REMOTION_DIR", str(Path(__file__).parents[4] / "remotion"))
+    )
+    REMOTION_MAX_WORKERS: int = int(os.getenv("REMOTION_MAX_WORKERS", "1"))
+
     # Volcano TTS (Doubao / Seed-TTS)
     # New BytePlus Speech Console uses a single API key.
     VOLCANO_TTS_API_KEY: str = os.getenv("VOLCANO_TTS_API_KEY", "")
@@ -65,6 +71,9 @@ class Config:
         # Global visual reference image for consistent art style
         self.VISUAL_REFERENCE_PATH = self.project_dir / "visual-reference.png"
 
+        # Remotion public directory (shared across projects, populated per-run)
+        self.REMOTION_PUBLIC_DIR = self.REMOTION_DIR / "public"
+
     def ensure_dirs(self) -> None:
         """Create asset/output directories if they do not exist."""
         for path in [
@@ -75,6 +84,7 @@ class Config:
             self.SUBTITLES_DIR,
             self.OUTPUT_DIR,
             self.LOGS_DIR,
+            self.REMOTION_PUBLIC_DIR,
         ]:
             path.mkdir(parents=True, exist_ok=True)
 

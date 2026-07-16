@@ -350,18 +350,80 @@ class VideoAssembler:
 
         return output_path
 
+    def _assemble_from_clips(
+        self,
+        clip_paths: list[Path],
+        audio_path: Path,
+        subtitle_path: Path,
+        bgm_path: Path | None,
+        output_path: Path,
+        burn_subtitles: bool,
+        subtitle_style: dict[str, Any] | None,
+    ) -> Path:
+        """Concatenate pre-rendered clips and merge with audio/subtitles."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            video_only_path = tmpdir_path / "video_only.mp4"
+            self._concat_files(clip_paths, video_only_path)
+
+            merged_path = tmpdir_path / "merged.mp4"
+            merge_args = [
+                "-i", str(video_only_path),
+                "-i", str(audio_path),
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-shortest",
+                str(merged_path),
+            ]
+            self._run_ffmpeg(merge_args)
+
+            subtitle_for_burn = subtitle_path if burn_subtitles else None
+            self._add_bgm_and_subtitles(
+                merged_path, subtitle_for_burn, output_path, bgm_path, subtitle_style
+            )
+
+        return output_path
+
+    def _concatenate_scene_audios(self, script: Script) -> Path:
+        """Concatenate all scene audio files into one MP3."""
+        audio_files: list[Path] = []
+        for scene in script.scenes:
+            audio_path = Path(self.config.AUDIO_DIR) / f"scene_{scene.scene_id}.mp3"
+            if not audio_path.exists():
+                raise FileNotFoundError(f"Audio not found: {audio_path}")
+            audio_files.append(audio_path)
+
+        output_path = Path(self.config.AUDIO_DIR) / "concatenated.mp3"
+        self._concat_files(audio_files, output_path, file_type="audio")
+        return output_path
+
     def assemble(
         self,
         script: Script,
         subtitle_path: Path,
         bgm_path: Path | None = None,
         output_path: Path | None = None,
+        scene_clips: list[Path] | None = None,
     ) -> Path:
         """Assemble the final video."""
         output_path = output_path or Path(self.config.OUTPUT_DIR) / "final.mp4"
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if script.uses_shots:
+        if scene_clips:
+            logger.info("Assembling from pre-rendered clips")
+            audio_path = self._concatenate_scene_audios(script)
+            self._assemble_from_clips(
+                scene_clips,
+                audio_path,
+                subtitle_path,
+                bgm_path,
+                output_path,
+                script.metadata.burn_subtitles,
+                script.metadata.subtitle_style,
+            )
+        elif script.uses_shots:
             logger.info("Assembling shot-based video")
             self._assemble_shots(script, subtitle_path, bgm_path, output_path)
         else:

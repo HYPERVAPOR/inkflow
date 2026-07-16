@@ -42,3 +42,13 @@ assets/music/*
 assets/subtitles/*
 output/*
 logs/*
+
+# Remotion
+remotion/node_modules/
+remotion/dist/
+remotion/build/
+remotion/public/*
+!remotion/public/.gitkeep
+remotion/.cache/
+remotion/package-lock.json
+remotion/out/

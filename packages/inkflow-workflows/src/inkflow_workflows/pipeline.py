@@ -60,7 +60,9 @@ class Pipeline:
         bgm = Path(bgm_path) if bgm_path else None
         if output.subtitle_path is None:
             raise RuntimeError("Workflow did not produce a subtitle path")
-        final_path = assembler.assemble(script, output.subtitle_path, bgm)
+        final_path = assembler.assemble(
+            script, output.subtitle_path, bgm, scene_clips=output.scene_clips
+        )
 
         # 7. Save cost summary
         cost_tracker.save()

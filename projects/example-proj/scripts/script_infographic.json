@@ -1,0 +1,126 @@
+{
+  "metadata": {
+    "title": "信息图示例：数据增长故事",
+    "resolution": "1080x1920",
+    "aspect_ratio": "9:16",
+    "fps": 30,
+    "style_prompt": "扁平化信息图风格，深蓝背景，明亮强调色",
+    "workflow": "infographic",
+    "remotion": {
+      "fps": 30,
+      "scale": 1.0,
+      "concurrency": 1
+    },
+    "default_transition": {
+      "type": "fade",
+      "duration": 0.5
+    },
+    "voice": {
+      "voice_id": "zh-CN-YunxiNeural",
+      "speed": 1.2,
+      "emotion": "neutral"
+    },
+    "subtitle_style": {
+      "FontName": "Noto Sans CJK SC",
+      "FontSize": 32,
+      "PrimaryColour": "&HFFFFFF&",
+      "OutlineColour": "&H000000&",
+      "Outline": 2,
+      "Alignment": 2,
+      "MarginV": 40
+    },
+    "burn_subtitles": false
+  },
+  "scenes": [
+    {
+      "scene_id": 1,
+      "subtitle": "2023 年，我们的用户只有一千人",
+      "shot_id": 1,
+      "duration_hint": 3
+    },
+    {
+      "scene_id": 2,
+      "subtitle": "到了 2024 年，暴涨到一万人",
+      "shot_id": 1,
+      "duration_hint": 3
+    },
+    {
+      "scene_id": 3,
+      "subtitle": "2025 年，预计突破十万人",
+      "shot_id": 2,
+      "duration_hint": 3
+    },
+    {
+      "scene_id": 4,
+      "subtitle": "增长的背后，是产品体验的持续打磨",
+      "shot_id": 2,
+      "duration_hint": 3
+    }
+  ],
+  "shots": [
+    {
+      "shot_id": 1,
+      "start_frame_prompt": "信息图背景：深蓝色科技感背景，数据增长主题，简洁扁平化设计",
+      "composition": {
+        "background": "#0f172a",
+        "elements": [
+          {
+            "id": "bg-shape",
+            "type": "shape",
+            "props": { "color": "#1e3a8a" },
+            "layout": { "x": 0, "y": 0, "width": "100%", "height": "100%" }
+          },
+          {
+            "id": "title",
+            "type": "text",
+            "props": { "text": "用户增长数据", "fontSize": 72, "color": "#ffffff" },
+            "layout": { "x": 0, "y": 200, "width": "100%", "height": 120 },
+            "animation": { "type": "fade_in", "duration": 0.6 }
+          },
+          {
+            "id": "chart",
+            "type": "chart_bar",
+            "props": {
+              "data": [1000, 10000],
+              "options": { "colors": ["#60a5fa", "#3b82f6"] }
+            },
+            "layout": { "x": 140, "y": 500, "width": 800, "height": 600 },
+            "animation": { "type": "draw", "duration": 1.2, "delay": 0.5 }
+          }
+        ]
+      }
+    },
+    {
+      "shot_id": 2,
+      "start_frame_prompt": "信息图背景：深蓝色科技感背景，一个向上箭头和增长曲线",
+      "composition": {
+        "background": "#0f172a",
+        "elements": [
+          {
+            "id": "bg-shape",
+            "type": "shape",
+            "props": { "color": "#1e293b" },
+            "layout": { "x": 0, "y": 0, "width": "100%", "height": "100%" }
+          },
+          {
+            "id": "prediction",
+            "type": "text",
+            "props": { "text": "2025 预测：100,000 用户", "fontSize": 64, "color": "#fbbf24" },
+            "layout": { "x": 0, "y": 300, "width": "100%", "height": 120 },
+            "animation": { "type": "slide_in", "duration": 0.6, "direction": "bottom" }
+          },
+          {
+            "id": "line-chart",
+            "type": "chart_line",
+            "props": {
+              "data": [1000, 10000, 100000],
+              "options": { "color": "#fbbf24" }
+            },
+            "layout": { "x": 140, "y": 600, "width": 800, "height": 500 },
+            "animation": { "type": "draw", "duration": 1.5, "delay": 0.4 }
+          }
+        ]
+      }
+    }
+  ]
+}

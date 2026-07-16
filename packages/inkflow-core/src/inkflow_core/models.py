@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -61,14 +61,62 @@ class Shot(BaseModel):
     """A continuous video clip covering one or more scenes."""
 
     shot_id: int
-    start_frame_prompt: str
-    video_motion_prompt: str
+    start_frame_prompt: str = ""
+    video_motion_prompt: str = ""
     use_reference_image: bool = False
     reference_from: int | Literal["prev"] | None = None
     hold_video: bool = False
     # If True, use the next shot's start frame as this shot's last frame
     # to guide Seedance toward a smoother transition.
     transition_to_next: bool = False
+
+    # Infographic workflow: declarative composition elements for Remotion.
+    composition: ShotComposition | None = None
+
+
+class CompositionElement(BaseModel):
+    """A single visual element inside an infographic composition."""
+
+    id: str
+    type: Literal[
+        "seedream_image",
+        "text",
+        "chart_line",
+        "chart_bar",
+        "chart_pie",
+        "map",
+        "shape",
+        "video",
+    ]
+    props: dict[str, Any] = Field(default_factory=dict)
+    layout: dict[str, int | float | str] = Field(default_factory=dict)
+    animation: dict[str, Any] = Field(default_factory=dict)
+
+
+class TransitionConfig(BaseModel):
+    """Transition configuration between infographic compositions."""
+
+    type: Literal["none", "fade", "slide", "shader", "seedance"] = "fade"
+    name: str | None = None
+    duration: float = 0.5
+    direction: Literal["left", "right", "top", "bottom"] | None = None
+
+
+class ShotComposition(BaseModel):
+    """Remotion composition definition for a single shot."""
+
+    elements: list[CompositionElement] = Field(default_factory=list)
+    transition: TransitionConfig | None = None
+    background: str | None = None
+
+
+class RemotionConfig(BaseModel):
+    """Global Remotion rendering configuration."""
+
+    fps: int = 30
+    scale: float = 1.0
+    concurrency: int = 1
+    browser_executable: str | None = None
 
 
 class Metadata(BaseModel):
@@ -103,6 +151,10 @@ class Metadata(BaseModel):
     # Explicit workflow selection. When omitted, the workflow is auto-detected
     # from script structure (shots present -> shot workflow, otherwise legacy).
     workflow: Literal["legacy", "shot", "infographic"] | None = None
+
+    # Remotion / infographic workflow configuration.
+    remotion: RemotionConfig | None = None
+    default_transition: TransitionConfig | None = None
 
 
 class Script(BaseModel):
