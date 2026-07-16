@@ -68,9 +68,19 @@ def _build_seedream_element(shot: Shot, image_filename: str) -> CompositionEleme
 
 def _transition_for_shot(shot: Shot, script: Script) -> TransitionConfig | None:
     """Return the transition config for a shot, falling back to metadata default."""
-    if shot.composition and shot.composition.transition:
-        return shot.composition.transition
-    return script.metadata.default_transition
+    transition = (
+        shot.composition.transition
+        if shot.composition and shot.composition.transition
+        else script.metadata.default_transition
+    )
+
+    if transition and transition.type == "seedance":
+        logger.warning(
+            "Seedance transition fallback is not implemented yet; using fade instead."
+        )
+        return TransitionConfig(type="fade", duration=transition.duration)
+
+    return transition
 
 
 class CompositionBuilder:

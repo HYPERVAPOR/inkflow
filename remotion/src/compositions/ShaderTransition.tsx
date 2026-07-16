@@ -2,10 +2,10 @@ import { useCurrentFrame, useVideoConfig } from "remotion";
 import { useEffect, useRef } from "react";
 
 export interface ShaderTransitionProps {
-  fromSrc: string;
-  toSrc: string;
+  src: string;
   shaderName: string;
   duration: number;
+  toColor?: [number, number, number];
 }
 
 const vertexShaderSource = `#version 300 es
@@ -17,23 +17,58 @@ void main() {
   v_texCoord = a_texCoord;
 }`;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentMix = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
-uniform sampler2D u_from;
-uniform sampler2D u_to;
+uniform sampler2D u_source;
 uniform float u_progress;
+uniform vec3 u_toColor;
 out vec4 outColor;
 void main() {
-  vec4 fromColor = texture(u_from, v_texCoord);
-  vec4 toColor = texture(u_to, v_texCoord);
-  outColor = mix(fromColor, toColor, u_progress);
+  vec4 sourceColor = texture(u_source, v_texCoord);
+  outColor = mix(sourceColor, vec4(u_toColor, 1.0), u_progress);
 }`;
 
+const fragmentCrossZoom = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_source;
+uniform float u_progress;
+uniform vec3 u_toColor;
+out vec4 outColor;
+void main() {
+  vec2 center = vec2(0.5, 0.5);
+  float zoom = 1.0 + u_progress * 0.5;
+  vec2 zoomed = center + (v_texCoord - center) / zoom;
+  vec4 sourceColor = texture(u_source, zoomed);
+  outColor = mix(sourceColor, vec4(u_toColor, 1.0), u_progress);
+}`;
+
+const fragmentPixelate = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_source;
+uniform float u_progress;
+uniform vec3 u_toColor;
+out vec4 outColor;
+float grid = 1.0 + u_progress * 99.0;
+vec2 pixelated = floor(v_texCoord * grid) / grid + 0.5 / grid;
+void main() {
+  vec4 sourceColor = texture(u_source, pixelated);
+  outColor = mix(sourceColor, vec4(u_toColor, 1.0), u_progress);
+}`;
+
+const shaders: Record<string, string> = {
+  mix: fragmentMix,
+  cross_zoom: fragmentCrossZoom,
+  pixelate: fragmentPixelate,
+};
+
 export const ShaderTransition: React.FC<ShaderTransitionProps> = ({
-  fromSrc,
-  toSrc,
+  src,
+  shaderName,
   duration,
+  toColor = [0, 0, 0],
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frame = useCurrentFrame();
@@ -49,6 +84,8 @@ export const ShaderTransition: React.FC<ShaderTransitionProps> = ({
       return;
     }
 
+    const fragmentSource = shaders[shaderName] || fragmentMix;
+
     const compileShader = (type: number, source: string) => {
       const shader = gl.createShader(type);
       if (!shader) return null;
@@ -63,7 +100,7 @@ export const ShaderTransition: React.FC<ShaderTransitionProps> = ({
     };
 
     const vertexShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
-    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
     if (!vertexShader || !fragmentShader) return;
 
     const program = gl.createProgram();
@@ -96,47 +133,43 @@ export const ShaderTransition: React.FC<ShaderTransitionProps> = ({
     gl.enableVertexAttribArray(texCoordLocation);
     gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
 
-    const loadTexture = (src: string) => {
-      const texture = gl.createTexture();
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      1,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array([0, 0, 0, 255])
+    );
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.src = src;
+    image.onload = () => {
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        1,
-        1,
-        0,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        new Uint8Array([0, 0, 0, 255])
-      );
-      const image = new Image();
-      image.crossOrigin = "anonymous";
-      image.src = src;
-      image.onload = () => {
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      };
-      return texture;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     };
 
-    const fromTexture = loadTexture(fromSrc);
-    const toTexture = loadTexture(toSrc);
-
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, fromTexture);
-    gl.uniform1i(gl.getUniformLocation(program, "u_from"), 0);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, toTexture);
-    gl.uniform1i(gl.getUniformLocation(program, "u_to"), 1);
-
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(gl.getUniformLocation(program, "u_source"), 0);
     gl.uniform1f(gl.getUniformLocation(program, "u_progress"), progress);
+    gl.uniform3f(
+      gl.getUniformLocation(program, "u_toColor"),
+      toColor[0] / 255,
+      toColor[1] / 255,
+      toColor[2] / 255
+    );
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-  }, [frame, fromSrc, toSrc, progress, width, height]);
+  }, [frame, src, shaderName, progress, width, height, toColor]);
 
   return (
     <canvas

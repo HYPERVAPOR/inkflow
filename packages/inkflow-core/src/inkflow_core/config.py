@@ -40,6 +40,7 @@ class Config:
         os.getenv("REMOTION_DIR", str(Path(__file__).parents[4] / "remotion"))
     )
     REMOTION_MAX_WORKERS: int = int(os.getenv("REMOTION_MAX_WORKERS", "1"))
+    REMOTION_GL: str = os.getenv("REMOTION_GL", "swiftshader")
 
     # Volcano TTS (Doubao / Seed-TTS)
     # New BytePlus Speech Console uses a single API key.

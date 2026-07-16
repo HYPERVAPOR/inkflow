@@ -3,6 +3,7 @@ import { SeedreamImage } from "./SeedreamImage";
 import { TextReveal } from "./TextReveal";
 import { Chart } from "./Chart";
 import { Map } from "./Map";
+import { ShaderTransition } from "./ShaderTransition";
 import { computeAnimationStyle } from "../lib/easing";
 import { getTransitionComponent } from "../lib/transitions";
 import type { CompositionElement, TransitionConfig } from "../lib/types";
@@ -102,11 +103,21 @@ export const Infographic: React.FC<InfographicProps> = ({
     ? getTransitionComponent(transition)
     : null;
 
+  const firstImageSrc = elements.find((e) => e.type === "seedream_image")?.props
+    .src as string | undefined;
+
   return (
     <AbsoluteFill style={bgStyle}>
       {elements.map(renderElement)}
-      {TransitionComponent && transition && (
+      {TransitionComponent && transition && transition.type !== "shader" && (
         <TransitionComponent frame={frame} fps={fps} config={transition} />
+      )}
+      {transition && transition.type === "shader" && firstImageSrc && (
+        <ShaderTransition
+          src={firstImageSrc}
+          shaderName={transition.name || "mix"}
+          duration={transition.duration}
+        />
       )}
     </AbsoluteFill>
   );

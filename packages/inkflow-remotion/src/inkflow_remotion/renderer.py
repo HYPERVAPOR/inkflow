@@ -29,6 +29,7 @@ class RemotionRenderer:
             str(output_path),
             "--props=composition.json",
             f"--concurrency={self.config.REMOTION_MAX_WORKERS}",
+            f"--gl={self.config.REMOTION_GL}",
         ]
         logger.info("Rendering Remotion composition %s -> %s", composition_id, output_path)
         subprocess.run(cmd, cwd=self.config.REMOTION_DIR, check=True)
