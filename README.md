@@ -4,20 +4,23 @@ AI 视频生成 Workflow。
 
 根据项目目录下的 `script.json` 自动生成画面、配音、字幕，并合成最终视频。
 
-每个视频对应一个独立的项目目录，方便同时管理多个视频。
+支持三种工作流：
+- **Legacy**: 静态图片 + Ken Burns
+- **Shot**: Seedance 视频片段
+- **Infographic**: Remotion 动态信息图（数据、图表、文字动效、WebGL shader）
 
 ## 快速开始
 
 ### 1. 安装依赖
 
-本项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖。
+本项目使用 [uv](https://docs.astral.sh/uv/) 管理 Python 依赖，使用 npm 管理 Remotion 依赖。
 
 ```bash
-# 创建虚拟环境并安装依赖
+# Python 依赖
 uv sync
 
-# 进入虚拟环境
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# Remotion 依赖（信息图工作流需要 Node.js）
+cd remotion && npm install && cd ..
 ```
 
 同时需要安装 [FFmpeg](https://ffmpeg.org/download.html) 并确保在 PATH 中。
@@ -28,11 +31,10 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 cp .env.example .env
 ```
 
-编辑 `.env`，填入你的火山方舟 API Key 和图片单价：
+编辑 `.env`，填入你的火山方舟 API Key：
 
 ```bash
 ARK_API_KEY=your_api_key_here
-SEEDREAM_PRICE_PER_IMAGE=0.002
 ```
 
 TTS 使用 Edge TTS，完全免费，无需额外配置。
@@ -44,14 +46,16 @@ TTS 使用 Edge TTS，完全免费，无需额外配置。
 ```text
 projects/example-proj/
 ├── scripts/
-│   └── script.json         # 视频脚本
+│   ├── script.json              # 默认脚本
+│   └── script_infographic.json  # 信息图示例脚本
 ├── assets/
-│   ├── images/             # 生成的画面
-│   ├── audio/              # 生成的配音
-│   ├── music/              # 背景音乐（可选）
-│   └── subtitles/          # 生成的字幕
-├── output/                 # 最终视频
-└── logs/                   # 运行日志
+│   ├── images/                  # 生成的画面
+│   ├── videos/                  # 生成的视频片段
+│   ├── audio/                   # 生成的配音
+│   ├── music/                   # 背景音乐（可选）
+│   └── subtitles/               # 生成的字幕
+├── output/                      # 最终视频
+└── logs/                        # 运行日志
 ```
 
 示例项目已放在 `projects/example-proj/`，可直接使用或复制一份改名字：
@@ -60,23 +64,17 @@ projects/example-proj/
 cp -r projects/example-proj projects/my_video
 ```
 
-每个 scene 包含：
-- `subtitle`: 旁白/字幕文本
-- `image_prompt`: 画面内容提示词
-- `use_reference_image`: 是否参考上一张图保持连续性
-- `voice`: TTS 音色配置
-
-全局风格词写在 `metadata.style_prompt` 中，会自动注入到每个画面的生成提示词里。
-
 ### 4. 生成视频
 
 ```bash
-uv run python main.py projects/example-proj
+# 默认脚本（legacy 或 shot）
+uv run inkflow projects/example-proj
+
+# 信息图示例
+uv run inkflow projects/example-proj --script scripts/script_infographic.json
 ```
 
 运行结束后会生成成本报告：`projects/example-proj/logs/cost.json`。
-
-> 提示：连续几句描述同一画面时，可在 scene 中设置 `"hold_image": true` 复用上一张图，节省成本并避免画面切换过快。详见 `AGENTS.md`。
 
 #### 添加背景音乐
 
@@ -85,49 +83,53 @@ uv run python main.py projects/example-proj
 或手动指定：
 
 ```bash
-uv run python main.py projects/example-proj --bgm projects/example-proj/assets/music/background.mp3
+uv run inkflow projects/example-proj --bgm projects/example-proj/assets/music/background.mp3
 ```
 
 #### 分步调试
 
 ```bash
-uv run python main.py projects/example-proj --step images
-uv run python main.py projects/example-proj --step audio
-uv run python main.py projects/example-proj --step subtitles
-uv run python main.py projects/example-proj --step video
-```
-
-#### 使用已安装的 CLI
-
-```bash
-uv run inkflow projects/example-proj
+uv run inkflow projects/example-proj --step images
+uv run inkflow projects/example-proj --step audio
+uv run inkflow projects/example-proj --step subtitles
+uv run inkflow projects/example-proj --step video
 ```
 
 ## 项目结构
 
 ```text
 .
-├── main.py                 # CLI 入口
-├── src/                    # 核心代码
-│   ├── config.py           # 项目目录与全局配置
-│   ├── models.py           # script.json 数据模型
-│   ├── script_loader.py    # 脚本加载/保存
-│   ├── image_generator.py  # Seedream 图片生成
-│   ├── tts_generator.py    # Edge TTS 语音生成
-│   ├── subtitle_generator.py  # SRT 字幕生成
-│   ├── video_assembler.py  # FFmpeg 视频合成
-│   ├── pipeline.py         # 流程编排
-│   └── cost_tracker.py     # API 成本追踪
-├── projects/               # 视频项目目录
+├── packages/                # Python monorepo (uv workspace)
+│   ├── inkflow-core/        # 模型、配置、类型
+│   ├── inkflow-generators/  # Seedream / Seedance / TTS / 字幕 / 封面
+│   ├── inkflow-workflows/   # 工作流编排器
+│   ├── inkflow-assembly/    # FFmpeg 合成
+│   ├── inkflow-remotion/    # Python ↔ Remotion 桥接
+│   └── inkflow-cli/         # CLI 入口
+├── remotion/                # Node.js Remotion 子项目
+├── projects/                # 视频项目目录
 │   └── example-proj/
-│       ├── scripts/script.json
-│       ├── assets/
-│       ├── output/
-│       └── logs/
 ├── pyproject.toml
-├── .env.example
-└── plan.md                 # 完整 workflow 设计文档
+└── .env.example
 ```
+
+## 工作流选择
+
+在 `script.json` 的 `metadata` 中指定：
+
+```json
+{
+  "metadata": {
+    "workflow": "infographic"
+  }
+}
+```
+
+- `legacy`: 静态图片工作流
+- `shot`: Seedance 视频工作流
+- `infographic`: Remotion 动态信息图工作流
+
+省略时按脚本结构自动推断。
 
 ## 成本追踪
 
@@ -140,15 +142,22 @@ Seedream 图片生成按分辨率计费：
 | ≤ 236 万像素 | 0.30 元 |
 | > 236 万像素 | 0.60 元 |
 
-例如 `1080x1920`（约 207 万像素）为 **0.30 元/张**。
+Seedance 视频约 0.172 元/秒（720p）。
+
+Remotion 信息图工作流主要成本为 Seedream 图片，渲染本身使用本地算力。
 
 Edge TTS 免费，成本记为 0。
 
-若 Seedream API 响应中包含 `usage.cost` 或 `usage.total_cost`，会优先使用响应中的实际费用；否则按上述分辨率档位估算。
+## 开发检查
+
+```bash
+uv run ruff check packages/
+uv run mypy packages/
+cd remotion && npm run lint
+```
 
 ## 注意事项
 
 - 图片生成调用 Seedream API，需要确保 `SEEDREAM_MODEL` 和 `SEEDREAM_BASE_URL` 与你的火山方舟账号一致。
-- `src/image_generator.py` 默认按 OpenAI-compatible 格式解析响应，如 Seedream 实际返回格式不同，请调整 `_call_api` 方法。
-- 参考图当前按 scene 顺序串行生成；如要并行化复杂依赖，可扩展 `generate` 中的依赖图逻辑。
+- Remotion 信息图工作流需要 Node.js 环境。
 - 新增视频项目时，复制 `projects/example-proj/` 目录并重命名即可，所有中间产物相互隔离。
