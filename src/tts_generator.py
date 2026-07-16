@@ -63,6 +63,7 @@ class TTSGenerator:
     def __init__(self, config: Config, cost_tracker: CostTracker | None = None) -> None:
         self.config = config
         self.cost_tracker = cost_tracker
+        self._volcano_sem = asyncio.Semaphore(config.VOLCANO_TTS_MAX_WORKERS)
 
     def _provider_for_scene(self, scene: Scene, script: Script) -> str:
         """Select TTS provider for a scene.
@@ -134,19 +135,20 @@ class TTSGenerator:
         output_path: Path,
     ) -> None:
         """Generate a scene's audio using the configured Volcano TTS endpoint."""
-        voice = self._voice_for_scene(scene, script, "volcano")
-        speed = self._speed_for_scene(scene, script)
-        logger.info(
-            "Generating Volcano TTS for scene %s with voice %s speed %.2f",
-            scene.scene_id,
-            voice,
-            speed,
-        )
+        async with self._volcano_sem:
+            voice = self._voice_for_scene(scene, script, "volcano")
+            speed = self._speed_for_scene(scene, script)
+            logger.info(
+                "Generating Volcano TTS for scene %s with voice %s speed %.2f",
+                scene.scene_id,
+                voice,
+                speed,
+            )
 
-        if "/api/v1/tts" in self.config.VOLCANO_TTS_BASE_URL:
-            await self._generate_volcano_v1(scene, script, output_path, voice, speed)
-        else:
-            await self._generate_volcano_v3(scene, script, output_path, voice, speed)
+            if "/api/v1/tts" in self.config.VOLCANO_TTS_BASE_URL:
+                await self._generate_volcano_v1(scene, script, output_path, voice, speed)
+            else:
+                await self._generate_volcano_v3(scene, script, output_path, voice, speed)
 
     async def _generate_volcano_v1(
         self,

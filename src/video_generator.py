@@ -33,6 +33,7 @@ class VideoTaskResult:
 @dataclass
 class VideoGenerationConfig:
     first_frame: str | None = None
+    last_frame: str | None = None
     ratio: str = "16:9"
     duration: int | None = None
     resolution: str | None = None
@@ -67,11 +68,12 @@ class VideoGenerator:
         output_dir: Path,
         start_frame_path: Path,
         duration: int,
+        last_frame_path: Path | None = None,
     ) -> Path:
         """Generate a video clip with concurrency limit."""
         async with self.semaphore:
             return await self._generate_one(
-                shot, metadata, output_dir, start_frame_path, duration
+                shot, metadata, output_dir, start_frame_path, duration, last_frame_path
             )
 
     def _get_headers(self) -> dict[str, str]:
@@ -87,6 +89,12 @@ class VideoGenerator:
                 "type": "image_url",
                 "image_url": {"url": config.first_frame},
                 "role": "first_frame",
+            })
+        if config.last_frame:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": config.last_frame},
+                "role": "last_frame",
             })
         return content
 
@@ -191,6 +199,7 @@ class VideoGenerator:
         output_dir: Path,
         start_frame_path: Path,
         duration: int,
+        last_frame_path: Path | None = None,
     ) -> Path:
         """Generate a video clip for a single shot."""
         output_path = output_dir / f"shot_{shot.shot_id}.mp4"
@@ -217,6 +226,7 @@ class VideoGenerator:
 
         config = VideoGenerationConfig(
             first_frame=_image_to_data_url(start_frame_path),
+            last_frame=_image_to_data_url(last_frame_path) if last_frame_path else None,
             ratio=ratio,
             duration=duration,
             resolution=resolution,
@@ -264,6 +274,7 @@ class VideoGenerator:
         script: Script,
         start_frame_map: dict[int, Path],
         shot_durations: dict[int, int],
+        last_frame_map: dict[int, Path] | None = None,
     ) -> dict[int, Path]:
         """Generate video clips for all shots.
 
@@ -271,12 +282,15 @@ class VideoGenerator:
             script: The script with shots.
             start_frame_map: Mapping from shot_id to start-frame image path.
             shot_durations: Mapping from shot_id to video duration in seconds.
+            last_frame_map: Optional mapping from shot_id to last-frame image path.
         """
         if not script.uses_shots:
             return {}
 
         output_dir = Path(self.config.VIDEOS_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        last_frame_map = last_frame_map or {}
 
         tasks = []
         for shot in script.shots:
@@ -286,9 +300,10 @@ class VideoGenerator:
             if not start_frame or not start_frame.exists():
                 raise FileNotFoundError(f"Start frame not found for shot {shot.shot_id}")
             duration = shot_durations.get(shot.shot_id, 5)
+            last_frame = last_frame_map.get(shot.shot_id)
             tasks.append(
                 self._generate_one_with_limit(
-                    shot, script.metadata, output_dir, start_frame, duration
+                    shot, script.metadata, output_dir, start_frame, duration, last_frame
                 )
             )
 

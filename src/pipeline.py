@@ -10,7 +10,7 @@ from .config import Config
 from .cost_tracker import CostTracker
 from .cover_generator import CoverGenerator
 from .image_generator import ImageGenerator
-from .models import Script
+from .models import Script, Shot
 from .script_loader import load_script, save_script
 from .shot_frame_generator import ShotFrameGenerator
 from .subtitle_generator import SubtitleGenerator
@@ -41,6 +41,40 @@ class Pipeline:
             total = sum(s.actual_duration or s.duration_hint or 3.0 for s in scenes)
             durations[shot.shot_id] = min(max(int(total) + (1 if total % 1 > 0 else 0), 1), max_duration)
         return durations
+
+    def _build_last_frame_map(
+        self, script: Script, start_frame_map: dict[int, Path]
+    ) -> dict[int, Path]:
+        """Build a mapping from shot_id to last-frame image path.
+
+        For shots with transition_to_next=True, the next non-hold shot's start
+        frame is used as the last frame to guide Seedance toward a smoother cut.
+        """
+        last_frame_map: dict[int, Path] = {}
+        sorted_shots = sorted(script.shots, key=lambda s: s.shot_id)
+        shot_by_id = {s.shot_id: s for s in sorted_shots}
+
+        for i, shot in enumerate(sorted_shots):
+            if not shot.transition_to_next:
+                continue
+            # Find the next non-hold shot after this one
+            next_shot: Shot | None = None
+            for j in range(i + 1, len(sorted_shots)):
+                candidate = sorted_shots[j]
+                if not candidate.hold_video:
+                    next_shot = candidate
+                    break
+            if next_shot is None:
+                continue
+            next_frame = start_frame_map.get(next_shot.shot_id)
+            if next_frame and next_frame.exists():
+                last_frame_map[shot.shot_id] = next_frame
+                logger.info(
+                    "Shot %s will transition to shot %s start frame as last frame",
+                    shot.shot_id,
+                    next_shot.shot_id,
+                )
+        return last_frame_map
 
     def run(self, script_path: str | Path, bgm_path: str | Path | None = None) -> Path:
         """Run the full pipeline and return the final video path."""
@@ -76,8 +110,9 @@ class Pipeline:
             # 4. Generate video clips from start frames
             logger.info("Step 4/5: Generating shot videos...")
             shot_durations = self._compute_shot_durations(script)
+            last_frame_map = self._build_last_frame_map(script, start_frame_map)
             video_gen = VideoGenerator(self.config, cost_tracker)
-            asyncio.run(video_gen.generate(script, start_frame_map, shot_durations))
+            asyncio.run(video_gen.generate(script, start_frame_map, shot_durations, last_frame_map))
         else:
             # Legacy image-based workflow
             logger.info("Using legacy image-based workflow")
@@ -150,9 +185,11 @@ class Pipeline:
                 with ShotFrameGenerator(self.config, cost_tracker) as frame_gen:
                     start_frame_map = frame_gen.generate(script)
                 shot_durations = self._compute_shot_durations(script)
+                last_frame_map = self._build_last_frame_map(script, start_frame_map)
                 video_gen = VideoGenerator(self.config, cost_tracker)
-                asyncio.run(video_gen.generate(script, start_frame_map, shot_durations))
-            subtitle_path = Path(self.config.SUBTITLES_DIR) / "caption.srt"
+                asyncio.run(video_gen.generate(script, start_frame_map, shot_durations, last_frame_map))
+            subtitle_gen = SubtitleGenerator(self.config)
+            subtitle_path = subtitle_gen.generate(script)
             VideoAssembler(self.config).assemble(script, subtitle_path)
         else:
             raise ValueError(f"Unknown step: {step}")

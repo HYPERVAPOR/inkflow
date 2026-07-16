@@ -34,7 +34,7 @@ inkflow/
 │   │   │   ├── videos/     # Seedance 生成的视频片段
 │   │   │   ├── audio/      # TTS 生成的配音
 │   │   │   ├── subtitles/  # SRT 字幕文件
-│   │   │   └── music/      # BGM
+│   │   │   └── music/      # 可选 BGM（默认不使用）
 │   │   ├── output/
 │   │   └── logs/
 │   └── lobotomy/           # 其他视频项目（被 .gitignore 忽略）
@@ -75,9 +75,6 @@ uv run python main.py projects/example-proj
 
 # 分步调试
 uv run python main.py projects/example-proj --step images|audio|subtitles|video
-
-# 指定 BGM
-uv run python main.py projects/example-proj --bgm /path/to/music.mp3
 ```
 
 ## 工作流
@@ -93,7 +90,7 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 3. **计算 shot 时长**：把属于同一 shot 的台词时长相加，向上取整，作为 Seedance 生成该段视频的目标时长（单段上限 12 秒）。
 4. **生成首帧图**：用 Seedream 为每个 shot 生成首帧，参考全局 `visual-reference.png`。
 5. **生成视频**：用 Seedance 以首帧图为输入，生成无声视频片段。
-6. **合成**：把各 shot 视频按 shot 总时长裁剪/循环，拼接画面，再拼接 scene 音频，合并后加字幕与 BGM。
+6. **合成**：把各 shot 视频按 shot 总时长裁剪/循环，拼接画面，再拼接 scene 音频，合并为最终视频。字幕默认单独输出 SRT 文件，不烧录进视频；**不添加 BGM**。
 
 ### Legacy 图片工作流
 
@@ -150,7 +147,7 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
       "Alignment": 2,
       "MarginV": 40
     },
-    "burn_subtitles": true,
+    "burn_subtitles": false,
     "video_model": "doubao-seedance-1-0-pro-250528",
     "video_resolution": "720p",
     "video_watermark": false,
@@ -196,6 +193,8 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 | `video_resolution` | **固定为 `720p`**，当前工作流不支持更高分辨率，用于控制成本                                                  |
 | `video_watermark`  | 是否带水印，默认 `false`                                                                                     |
 | `video_system_prompt` | 系统级视频风格提示词，自动追加到每条 `start_frame_prompt`、`video_motion_prompt`、封面图和 legacy `image_prompt` 前面，用于统一全片动画风格 |
+| `burn_subtitles`   | 是否把字幕烧录进视频，默认 `false`；需要硬字幕时才设为 `true`                                                |
+| `subtitle_style`   | ASS 字幕样式，仅在 `burn_subtitles=true` 时生效                                                               |
 
 #### 封面图 `cover_image`
 
@@ -223,21 +222,49 @@ InkFlow 支持两种工作流，按 `script.json` 自动选择：
 - 口语化，像对朋友讲故事。
 - **字幕结尾不要加句号**，保持干净、利落，符合短视频平台习惯。
 
+### 2.1 字幕输出方式
+
+- **默认不将字幕烧录进视频**。
+- 字幕以独立 `assets/subtitles/caption.srt` 文件形式输出，方便平台自动识别或用户二次编辑。
+- 只有用户明确要求“把字幕打到视频里”时，才将 `metadata.burn_subtitles` 设为 `true` 并烧录。
+
 ### 3. 画面节奏
 
 - 每个 scene 停留 2.5-4 秒。
+- **每个 shot 尽量控制在 5 秒以内**，保持快节奏，避免拖沓。
+  - 若当前镜头确实需要长镜头叙事（如情绪渲染、复杂动作展示），可以豁免，但要主动斟酌并说明理由。
+  - 若 shot 超过 5 秒，优先考虑拆 shot 或精简台词。
 - 每个 shot 总时长不要超过 12 秒（Seedance 单段上限）。
 - 可以把 2-4 句相关台词合并到一个 shot，避免 PPT 式切换。
 - 每句台词对应具体视觉意象。
+- 高潮场景（打斗、对决、反转）可以适当放慢，用 1–2 个长 shot 强化张力。
 
 ### 4. 画幅
 
 - 知识/叙事类：横屏 `1920x1080`（16:9）。
 - 短平快/强情绪类：竖屏 `1080x1920`（9:16）。
 
-### 5. 脚本创作流程（分四步 + 用户审阅）
+### 5. 脚本创作流程（分五步 + 用户审阅 + 成本审计）
 
 脚本不是一次性写成最终 `script.json`，而是分步完成，确保画面、运动与叙事上下文一致。完整流程与 shot 策略见 `docs/script-instruction.md` 第 6 章。
+
+**分步确认原则**
+
+每个关键步骤完成后，Agent 必须向用户报告结果、当前状态和下一步计划，**等待用户批准后再继续下一步**。关键步骤包括：
+
+1. 纯文本脚本 (`script_text.md`) 完成后；
+2. `script.json` 的 scenes 与 shot 分组完成后；
+3. TTS 跑完、拿到真实时长后（同时提交成本审计）；
+4. 画面与运动提示词补全后；
+5. 首帧图生成后（可抽样让用户确认画风）；
+6. 视频片段生成后；
+7. 最终合成前。
+
+用户明确说"下一步"或"继续"后，再进入下一阶段。
+
+**成本审计原则**
+
+每期视频生成成本（首帧图 + Seedance 视频 + TTS）**应控制在 50 CNY 以内**。在生成首帧图和视频之前，必须根据 `actual_duration` 和 shot 数量做成本估算；若超过 50 CNY，需先向用户说明并获确认，或精简 shot/台词以压低成本。**本次 acquaintance-society 项目为例外，已获用户批准。**
 
 **第零步：输出纯文本脚本供用户审阅（新增）**
 
@@ -282,7 +309,24 @@ uv run python main.py projects/<name> --step audio
 
 > **必须做这一步**：`duration_hint` 只是估算，TTS 真实时长可能更长。如果不先验证，Seedance 生成 12 秒视频后，后面合成时只能靠循环/裁剪硬对齐，效果会变差。
 
-**第四步：补全画面与运动提示词**
+**第四步：成本审计**
+
+拿到真实时长后，在生成任何首帧图之前，先估算本期视频成本：
+
+```bash
+# 估算公式（按当前 AGENTS.md 价格）
+首帧图成本 = 需要生成首帧的 shot 数 × 0.30 元
+视频成本   = 所有 shot 真实时长之和 × 0.172 元
+TTS 成本   = 以 logs/cost.json 中 summary.total_cost_cny 为准（Edge TTS 免费）
+总成本     = 首帧图成本 + 视频成本 + TTS 成本
+```
+
+- **若总成本 ≤ 50 CNY**：继续下一步。
+- **若总成本 > 50 CNY**：必须暂停，向用户报告估算明细，并给出降本方案（如精简台词、合并 shot、减少 `use_reference_image` 依赖以复用视频等），待用户明确同意后再继续生成画面。
+
+> **为什么做这一步**：首帧图和视频生成是主要成本来源，一旦开始调用 API 就无法撤回。成本审计应在烧 API 之前完成，避免超预算。
+
+**第五步：补全画面与运动提示词**
 
 确认 shot 分组和时长都 OK 后，再补全 `start_frame_prompt` 和 `video_motion_prompt`：
 

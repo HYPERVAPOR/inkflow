@@ -66,6 +66,9 @@ class Shot(BaseModel):
     use_reference_image: bool = False
     reference_from: int | Literal["prev"] | None = None
     hold_video: bool = False
+    # If True, use the next shot's start frame as this shot's last frame
+    # to guide Seedance toward a smoother transition.
+    transition_to_next: bool = False
 
 
 class Metadata(BaseModel):

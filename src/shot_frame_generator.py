@@ -206,7 +206,9 @@ class ShotFrameGenerator:
         """Generate start-frame images for all shots respecting dependencies.
 
         - Independent shots (no prev reference) are generated concurrently.
-        - Dependent shots (use_reference_image with prev) are generated sequentially.
+        - Dependent shots are grouped into dependency chains by their root;
+          each chain runs sequentially internally, but multiple independent
+          chains run concurrently.
         - hold_video shots reuse the previous shot's start frame.
         """
         if not script.uses_shots:
@@ -219,10 +221,52 @@ class ShotFrameGenerator:
         shots = sorted(script.shots, key=lambda s: s.shot_id)
         non_hold_shots = [s for s in shots if not s.hold_video]
 
-        # 1. Generate independent shots concurrently
-        independent_shots = [s for s in non_hold_shots if not s.use_reference_image]
-        if independent_shots:
-            logger.info("Generating %s independent shot frames concurrently", len(independent_shots))
+        # Build parent map and child map for dependency analysis
+        shot_by_id = {s.shot_id: s for s in non_hold_shots}
+        parent_of: dict[int, int | None] = {}
+        children_of: dict[int, list[int]] = {}
+        for shot in non_hold_shots:
+            children_of[shot.shot_id] = []
+        for shot in non_hold_shots:
+            ref = shot.reference_from
+            if ref == "prev":
+                parent = shot.shot_id - 1
+            elif isinstance(ref, int):
+                parent = ref
+            else:
+                parent = None
+            if parent is not None and parent in shot_by_id:
+                parent_of[shot.shot_id] = parent
+                children_of.setdefault(parent, []).append(shot.shot_id)
+            else:
+                parent_of[shot.shot_id] = None
+
+        # Find roots and build chains
+        roots = [sid for sid, parent in parent_of.items() if parent is None]
+
+        def build_chain(root_id: int) -> list[int]:
+            chain = [root_id]
+            current = root_id
+            while True:
+                next_nodes = [c for c in children_of.get(current, []) if parent_of.get(c) == current]
+                if not next_nodes:
+                    break
+                # Continue along the first child (scripts typically use prev chains)
+                current = min(next_nodes)
+                chain.append(current)
+            return chain
+
+        chains = [build_chain(r) for r in sorted(roots)]
+        independent_roots = [chain[0] for chain in chains if len(chain) == 1]
+        dependency_chains = [chain for chain in chains if len(chain) > 1]
+
+        # 1. Generate single independent shots concurrently
+        if independent_roots:
+            independent_shots = [shot_by_id[sid] for sid in independent_roots]
+            logger.info(
+                "Generating %s independent shot frames concurrently",
+                len(independent_shots),
+            )
             with ThreadPoolExecutor(max_workers=self.config.SEEDREAM_MAX_WORKERS) as executor:
                 futures = {
                     executor.submit(
@@ -239,13 +283,28 @@ class ShotFrameGenerator:
                         logger.error("Failed to generate start frame for shot %s: %s", shot.shot_id, e)
                         raise
 
-        # 2. Generate dependent shots sequentially in shot_id order
-        dependent_shots = [s for s in non_hold_shots if s.use_reference_image]
-        if dependent_shots:
-            logger.info("Generating %s dependent shot frames sequentially", len(dependent_shots))
-            for shot in sorted(dependent_shots, key=lambda s: s.shot_id):
-                path = self._generate_one(shot, script.metadata, output_dir, reference_map)
-                reference_map[shot.shot_id] = path
+        # 2. Generate each dependency chain concurrently; within a chain sequentially
+        if dependency_chains:
+            logger.info(
+                "Generating %s dependency chains concurrently (%s shots total)",
+                len(dependency_chains),
+                sum(len(c) for c in dependency_chains),
+            )
+
+            def run_chain(chain: list[int]) -> None:
+                for shot_id in chain:
+                    shot = shot_by_id[shot_id]
+                    path = self._generate_one(shot, script.metadata, output_dir, reference_map)
+                    reference_map[shot_id] = path
+
+            with ThreadPoolExecutor(max_workers=self.config.SEEDREAM_MAX_WORKERS) as executor:
+                futures = [executor.submit(run_chain, chain) for chain in dependency_chains]
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logger.error("Failed to generate dependency chain: %s", e)
+                        raise
 
         # 3. Handle hold_video shots after their predecessors exist
         hold_shots = [s for s in shots if s.hold_video]
