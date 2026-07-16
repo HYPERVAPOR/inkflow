@@ -21,8 +21,8 @@ def _format_srt_time(seconds: float) -> str:
 class SubtitleGenerator:
     """Generate SRT subtitle files."""
 
-    def __init__(self, config: Config | None = None) -> None:
-        self.config = config or Config
+    def __init__(self, config: Config) -> None:
+        self.config = config
 
     def _scene_to_entry(self, index: int, scene: Scene, start: float, end: float) -> str:
         """Create a single SRT entry."""

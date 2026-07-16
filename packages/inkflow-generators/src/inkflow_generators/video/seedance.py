@@ -7,7 +7,7 @@ import base64
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from inkflow_core.config import Config
@@ -24,7 +24,7 @@ class VideoTaskResult:
     task_id: str | None = None
     video_url: str | None = None
     error: str | None = None
-    error_detail: dict | None = None
+    error_detail: dict[str, Any] | None = None
     status: str = "pending"
     usage: dict[str, Any] = field(default_factory=dict)
 
@@ -128,7 +128,7 @@ class VideoGenerator:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(url, headers=self._get_headers(), json=body)
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def _get_task_status(self, task_id: str) -> dict[str, Any]:
         url = f"{self.api_base}/contents/generations/tasks/{task_id}"
@@ -136,7 +136,7 @@ class VideoGenerator:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(url, headers=self._get_headers())
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def _poll_task(
         self,
@@ -313,7 +313,7 @@ class VideoGenerator:
             if isinstance(result, Exception):
                 logger.error("Failed to generate video for shot %s: %s", shot.shot_id, result)
                 raise result
-            video_map[shot.shot_id] = result
+            video_map[shot.shot_id] = result  # type: ignore[assignment]
 
         # Handle hold_video shots
         for shot in script.shots:

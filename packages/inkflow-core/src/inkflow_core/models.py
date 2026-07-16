@@ -100,6 +100,10 @@ class Metadata(BaseModel):
     # unified animation style across the whole video.
     video_system_prompt: str = ""
 
+    # Explicit workflow selection. When omitted, the workflow is auto-detected
+    # from script structure (shots present -> shot workflow, otherwise legacy).
+    workflow: Literal["legacy", "shot", "infographic"] | None = None
+
 
 class Script(BaseModel):
     """Root video script model."""
@@ -117,6 +121,13 @@ class Script(BaseModel):
     def uses_shots(self) -> bool:
         """Return True if the script uses the shot-based video workflow."""
         return bool(self.shots) and any(s.shot_id is not None for s in self.scenes)
+
+    @property
+    def resolved_workflow(self) -> Literal["legacy", "shot", "infographic"]:
+        """Return the resolved workflow name for this script."""
+        if self.metadata.workflow:
+            return self.metadata.workflow
+        return "shot" if self.uses_shots else "legacy"
 
     def shot_for_scene(self, scene: Scene) -> Shot | None:
         """Return the shot associated with a scene, if any."""

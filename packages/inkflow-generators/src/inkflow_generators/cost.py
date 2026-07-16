@@ -235,7 +235,7 @@ class CostTracker:
         # Deduplicate by a stable key that ignores timestamp, so that
         # re-running the same operation for the same shot replaces the
         # previous entry rather than creating a duplicate.
-        def _entry_key(entry: dict[str, Any]) -> tuple:
+        def _entry_key(entry: dict[str, Any]) -> tuple[Any, ...]:
             return (
                 entry.get("operation"),
                 entry.get("model"),
@@ -243,7 +243,7 @@ class CostTracker:
                 entry.get("note"),
             )
 
-        merged: dict[tuple, dict[str, Any]] = {}
+        merged: dict[tuple[Any, ...], dict[str, Any]] = {}
         for entry in existing_entries + new_entries:
             merged[_entry_key(entry)] = entry
 

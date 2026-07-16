@@ -161,7 +161,7 @@ class CoverGenerator:
         logger.info("Saved vertical cover: %s", output_path)
         return output_path
 
-    def _load_font(self, font_size: int) -> ImageFont.FreeTypeFont | ImageFont.Font:
+    def _load_font(self, font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         """Load a CJK-capable font if available, otherwise fall back to default."""
         candidates = [
             "Noto Sans CJK SC",
@@ -234,7 +234,7 @@ class CoverGenerator:
         self,
         draw: ImageDraw.ImageDraw,
         text: str,
-        font: ImageFont.FreeTypeFont | ImageFont.Font,
+        font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
         max_width: int,
     ) -> list[str]:
         """Wrap text into lines that fit within max_width."""

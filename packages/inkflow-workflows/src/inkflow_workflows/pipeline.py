@@ -8,7 +8,7 @@ from pathlib import Path
 
 from inkflow_assembly.assembler import VideoAssembler
 from inkflow_core.config import Config
-from inkflow_core.models import Script, Shot
+from inkflow_core.models import Script
 from inkflow_core.script_loader import load_script, save_script
 from inkflow_generators.cost import CostTracker
 from inkflow_generators.cover import CoverGenerator
@@ -16,7 +16,8 @@ from inkflow_generators.image.seedream import ImageGenerator
 from inkflow_generators.image.shot_frame import ShotFrameGenerator
 from inkflow_generators.subtitle import SubtitleGenerator
 from inkflow_generators.tts.generator import TTSGenerator
-from inkflow_generators.video.seedance import VideoGenerator
+
+from .base import WorkflowRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -28,53 +29,15 @@ class Pipeline:
         self.config = config
         self.config.ensure_dirs()
 
-    def _compute_shot_durations(self, script: Script) -> dict[int, int]:
-        """Compute target video duration in seconds for each shot.
+    def _run_tts_and_compute_durations(self, script: Script, cost_tracker: CostTracker) -> None:
+        """Generate TTS audio and compute actual scene durations."""
+        logger.info("Step 1/5: Generating TTS audio...")
+        tts_gen = TTSGenerator(self.config, cost_tracker)
+        asyncio.run(tts_gen.generate(script))
 
-        The duration is the sum of actual scene durations rounded up to the
-        nearest integer and capped at the model's per-clip limit (12s).
-        """
-        max_duration = 12
-        durations: dict[int, int] = {}
-        for shot in script.shots:
-            scenes = script.scenes_for_shot(shot)
-            total = sum(s.actual_duration or s.duration_hint or 3.0 for s in scenes)
-            rounded = int(total) + (1 if total % 1 > 0 else 0)
-            durations[shot.shot_id] = min(max(rounded, 1), max_duration)
-        return durations
-
-    def _build_last_frame_map(
-        self, script: Script, start_frame_map: dict[int, Path]
-    ) -> dict[int, Path]:
-        """Build a mapping from shot_id to last-frame image path.
-
-        For shots with transition_to_next=True, the next non-hold shot's start
-        frame is used as the last frame to guide Seedance toward a smoother cut.
-        """
-        last_frame_map: dict[int, Path] = {}
-        sorted_shots = sorted(script.shots, key=lambda s: s.shot_id)
-
-        for i, shot in enumerate(sorted_shots):
-            if not shot.transition_to_next:
-                continue
-            # Find the next non-hold shot after this one
-            next_shot: Shot | None = None
-            for j in range(i + 1, len(sorted_shots)):
-                candidate = sorted_shots[j]
-                if not candidate.hold_video:
-                    next_shot = candidate
-                    break
-            if next_shot is None:
-                continue
-            next_frame = start_frame_map.get(next_shot.shot_id)
-            if next_frame and next_frame.exists():
-                last_frame_map[shot.shot_id] = next_frame
-                logger.info(
-                    "Shot %s will transition to shot %s start frame as last frame",
-                    shot.shot_id,
-                    next_shot.shot_id,
-                )
-        return last_frame_map
+        logger.info("Step 2/5: Computing audio durations...")
+        tts_gen.apply_to_script(script)
+        save_script(script, Path(self.config.LOGS_DIR) / "script_with_duration.json")
 
     def run(self, script_path: str | Path, bgm_path: str | Path | None = None) -> Path:
         """Run the full pipeline and return the final video path."""
@@ -83,63 +46,21 @@ class Pipeline:
 
         cost_tracker = CostTracker(self.config)
 
-        # 1. Generate TTS audio (needed for timing in both workflows)
-        logger.info("Step 1/5: Generating TTS audio...")
-        tts_gen = TTSGenerator(self.config, cost_tracker)
-        asyncio.run(tts_gen.generate(script))
+        # 1-2. TTS and timing (shared by all workflows)
+        self._run_tts_and_compute_durations(script, cost_tracker)
 
-        # 2. Compute actual durations
-        logger.info("Step 2/5: Computing audio durations...")
-        tts_gen.apply_to_script(script)
-        save_script(script, Path(self.config.LOGS_DIR) / "script_with_duration.json")
+        # 3-5. Dispatch to the correct workflow for media generation
+        workflow_cls = WorkflowRegistry.resolve(script)
+        workflow = workflow_cls(self.config, cost_tracker)
+        output = asyncio.run(workflow.run(script))
 
-        if script.uses_shots:
-            # Shot-based workflow: script -> TTS -> shots -> start frames -> videos
-            logger.info("Using shot-based video workflow")
-
-            # 3. Generate start-frame images for shots
-            logger.info("Step 3/5: Generating shot start frames...")
-            with ShotFrameGenerator(self.config, cost_tracker) as frame_gen:
-                start_frame_map = frame_gen.generate(script)
-
-            # 3.5 Generate cover images
-            logger.info("Generating cover images...")
-            with CoverGenerator(self.config, cost_tracker) as cover_gen:
-                cover_gen.generate(script)
-
-            # 4. Generate video clips from start frames
-            logger.info("Step 4/5: Generating shot videos...")
-            shot_durations = self._compute_shot_durations(script)
-            last_frame_map = self._build_last_frame_map(script, start_frame_map)
-            video_gen = VideoGenerator(self.config, cost_tracker)
-            asyncio.run(video_gen.generate(script, start_frame_map, shot_durations, last_frame_map))
-        else:
-            # Legacy image-based workflow
-            logger.info("Using legacy image-based workflow")
-
-            # 3. Generate images
-            logger.info("Step 3/5: Generating images...")
-            with ImageGenerator(self.config, cost_tracker) as image_gen:
-                image_gen.generate(script)
-
-            # 3.5 Generate cover images
-            logger.info("Generating cover images...")
-            with CoverGenerator(self.config, cost_tracker) as cover_gen:
-                cover_gen.generate(script)
-
-            # 4. No separate video generation step for legacy path
-            logger.info("Step 4/5: Image generation complete")
-
-        # 5. Generate subtitles
-        logger.info("Step 5/5: Generating subtitles...")
-        subtitle_gen = SubtitleGenerator(self.config)
-        subtitle_path = subtitle_gen.generate(script)
-
-        # 6. Assemble video
+        # 6. Assemble final video
         logger.info("Assembling final video...")
         assembler = VideoAssembler(self.config)
         bgm = Path(bgm_path) if bgm_path else None
-        final_path = assembler.assemble(script, subtitle_path, bgm)
+        if output.subtitle_path is None:
+            raise RuntimeError("Workflow did not produce a subtitle path")
+        final_path = assembler.assemble(script, output.subtitle_path, bgm)
 
         # 7. Save cost summary
         cost_tracker.save()
@@ -164,35 +85,32 @@ class Pipeline:
 
         cost_tracker = CostTracker(self.config)
 
-        if step == "images":
-            if script.uses_shots:
-                with ShotFrameGenerator(self.config, cost_tracker) as gen:
-                    gen.generate(script)
-            else:
-                with ImageGenerator(self.config, cost_tracker) as gen:
-                    gen.generate(script)
-        elif step == "audio":
+        if step == "audio":
             tts_gen = TTSGenerator(self.config, cost_tracker)
             asyncio.run(tts_gen.generate(script))
         elif step == "subtitles":
             tts_gen = TTSGenerator(self.config, cost_tracker)
             tts_gen.apply_to_script(script)
             SubtitleGenerator(self.config).generate(script)
+        elif step == "images":
+            self._run_tts_and_compute_durations(script, cost_tracker)
+            workflow_name = script.resolved_workflow
+            if workflow_name == "shot":
+                with ShotFrameGenerator(self.config, cost_tracker) as gen:
+                    gen.generate(script)
+            else:
+                with ImageGenerator(self.config, cost_tracker) as gen:
+                    gen.generate(script)
+            with CoverGenerator(self.config, cost_tracker) as gen:
+                gen.generate(script)
         elif step == "video":
-            tts_gen = TTSGenerator(self.config, cost_tracker)
-            tts_gen.apply_to_script(script)
-            if script.uses_shots:
-                with ShotFrameGenerator(self.config, cost_tracker) as frame_gen:
-                    start_frame_map = frame_gen.generate(script)
-                shot_durations = self._compute_shot_durations(script)
-                last_frame_map = self._build_last_frame_map(script, start_frame_map)
-                video_gen = VideoGenerator(self.config, cost_tracker)
-                asyncio.run(
-                    video_gen.generate(script, start_frame_map, shot_durations, last_frame_map)
-                )
-            subtitle_gen = SubtitleGenerator(self.config)
-            subtitle_path = subtitle_gen.generate(script)
-            VideoAssembler(self.config).assemble(script, subtitle_path)
+            self._run_tts_and_compute_durations(script, cost_tracker)
+            workflow_cls = WorkflowRegistry.resolve(script)
+            workflow = workflow_cls(self.config, cost_tracker)
+            output = asyncio.run(workflow.run(script))
+            if output.subtitle_path is None:
+                raise RuntimeError("Workflow did not produce a subtitle path")
+            VideoAssembler(self.config).assemble(script, output.subtitle_path)
         else:
             raise ValueError(f"Unknown step: {step}")
 

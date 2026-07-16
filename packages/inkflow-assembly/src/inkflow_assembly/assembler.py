@@ -29,8 +29,8 @@ DEFAULT_SUBTITLE_STYLE: dict[str, Any] = {
 class VideoAssembler:
     """Assemble images/videos, audio, subtitles and BGM into final video."""
 
-    def __init__(self, config: Config | None = None) -> None:
-        self.config = config or Config
+    def __init__(self, config: Config) -> None:
+        self.config = config
 
     def _run_ffmpeg(self, args: list[str]) -> None:
         """Run an FFmpeg command."""

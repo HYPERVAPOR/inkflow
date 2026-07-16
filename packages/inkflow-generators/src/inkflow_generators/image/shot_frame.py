@@ -302,10 +302,10 @@ class ShotFrameGenerator:
                     reference_map[shot_id] = path
 
             with ThreadPoolExecutor(max_workers=self.config.SEEDREAM_MAX_WORKERS) as executor:
-                futures = [executor.submit(run_chain, chain) for chain in dependency_chains]
-                for future in as_completed(futures):
+                chain_futures = [executor.submit(run_chain, chain) for chain in dependency_chains]
+                for chain_future in as_completed(chain_futures):
                     try:
-                        future.result()
+                        chain_future.result()
                     except Exception as e:
                         logger.error("Failed to generate dependency chain: %s", e)
                         raise
