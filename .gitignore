@@ -50,5 +50,7 @@ remotion/build/
 remotion/public/*
 !remotion/public/.gitkeep
 remotion/.cache/
-remotion/package-lock.json
 remotion/out/
+
+# pnpm
+.pnpm-store/

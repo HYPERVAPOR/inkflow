@@ -19,7 +19,7 @@ InkFlow 根据 `script.json` 自动生成画面、配音、字幕，输出 `outp
 uv sync
 
 # 2. 安装 Remotion 依赖（信息图工作流需要 Node.js）
-cd remotion && npm install && cd ..
+cd remotion && pnpm install && cd ..
 
 # 3. 生成视频
 uv run inkflow projects/example-proj
@@ -104,7 +104,7 @@ uv run ruff check packages/
 uv run mypy packages/
 
 # Remotion 检查
-cd remotion && npm run lint
+cd remotion && pnpm run lint
 ```
 
 ## 工作流
@@ -386,7 +386,7 @@ Edge TTS 免费。成本写入 `logs/cost.json`。
 - Python ≥3.10
 - `uv run ruff check packages/`
 - `uv run mypy packages/`
-- Remotion: `cd remotion && npm run lint`
+- Remotion: `cd remotion && pnpm run lint`
 
 ## 注意事项
 
@@ -405,6 +405,6 @@ Edge TTS 免费。成本写入 `logs/cost.json`。
 uv run python -m py_compile packages/*/src/**/*.py packages/*/*/**/*.py
 uv run ruff check packages/
 uv run mypy packages/
-cd remotion && npm run lint
+cd remotion && pnpm run lint
 uv run inkflow projects/example-proj --script scripts/script_infographic.json --step images
 ```

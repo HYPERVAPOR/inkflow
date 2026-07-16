@@ -20,7 +20,7 @@ AI 视频生成 Workflow。
 uv sync
 
 # Remotion 依赖（信息图工作流需要 Node.js）
-cd remotion && npm install && cd ..
+cd remotion && pnpm install && cd ..
 ```
 
 同时需要安装 [FFmpeg](https://ffmpeg.org/download.html) 并确保在 PATH 中。
@@ -153,7 +153,7 @@ Edge TTS 免费，成本记为 0。
 ```bash
 uv run ruff check packages/
 uv run mypy packages/
-cd remotion && npm run lint
+cd remotion && pnpm run lint
 ```
 
 ## 注意事项
