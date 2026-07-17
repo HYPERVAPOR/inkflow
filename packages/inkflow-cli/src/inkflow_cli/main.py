@@ -28,7 +28,10 @@ def main() -> None:
     parser.add_argument("project", help="Path to project directory (e.g., projects/example-proj)")
     parser.add_argument(
         "--script",
-        help="Path to script.json (default: <project>/scripts/script.json)",
+        help=(
+            "Path to script.md or script.json "
+            "(default: <project>/scripts/script.md, fallback script.json)"
+        ),
         default=None,
     )
     parser.add_argument(
@@ -45,7 +48,12 @@ def main() -> None:
     args = parser.parse_args()
 
     project_dir = Path(args.project)
-    script_path = Path(args.script) if args.script else project_dir / "scripts" / "script.json"
+    if args.script:
+        script_path = Path(args.script)
+    else:
+        script_json = project_dir / "scripts" / "script.json"
+        script_md = project_dir / "scripts" / "script.md"
+        script_path = script_md if script_md.exists() else script_json
     bgm_path = Path(args.bgm) if args.bgm else project_dir / "assets" / "music" / "bgm.mp3"
     # Use provided bgm only if it exists; otherwise treat as None
     bgm = bgm_path if bgm_path.exists() else None

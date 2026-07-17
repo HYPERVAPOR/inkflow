@@ -102,7 +102,7 @@ class Pipeline:
                     gen.generate(script)
             else:
                 with ImageGenerator(self.config, cost_tracker) as gen:
-                    gen.generate(script)
+                    gen.generate_for_script(script)
             with CoverGenerator(self.config, cost_tracker) as gen:
                 gen.generate(script)
         elif step == "video":

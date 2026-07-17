@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from inkflow_core.config import Config
-from inkflow_core.models import Scene, Script, Shot
+from inkflow_core.models import Script, Shot
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,14 @@ DEFAULT_SUBTITLE_STYLE: dict[str, Any] = {
     "Alignment": 2,
     "MarginV": 40,
 }
+
+
+def _format_motion(motion: dict[str, Any]) -> tuple[str, str]:
+    """Return (start, end) motion strings with defaults."""
+    return (
+        motion.get("start", "zoom_1.0_pan_0_0"),
+        motion.get("end", "zoom_1.0_pan_0_0"),
+    )
 
 
 class VideoAssembler:
@@ -56,22 +64,21 @@ class VideoAssembler:
         return int(parts[0]), int(parts[1])
 
     def _build_ken_burns_filter(
-        self, scene: Scene, width: int, height: int, duration: float, fps: int
+        self, motion: dict[str, Any], width: int, height: int, duration: float, fps: int
     ) -> str:
         """Build a simple zoompan filter for Ken Burns effect."""
         frames = int(duration * fps)
+        _start, end = _format_motion(motion)
 
-        # Parse end zoom from motion.end string like "zoom_1.15_pan_0_0"
         end_zoom = 1.15
         try:
-            parts = scene.motion.end.split("_")
+            parts = end.split("_")
             for i, part in enumerate(parts):
                 if part == "zoom":
                     end_zoom = float(parts[i + 1])
         except (IndexError, ValueError):
             pass
 
-        # Use scale to target resolution then zoompan
         return (
             f"scale={width * 2}:{height * 2},"
             f"zoompan=z='min(pzoom+{(end_zoom - 1.0) / max(frames, 1):.6f},{end_zoom})':"
@@ -79,20 +86,24 @@ class VideoAssembler:
             f"d={frames}:s={width}x{height}:fps={fps}"
         )
 
-    def _render_legacy_scene(
+    def _render_legacy_subtitle(
         self,
-        scene: Scene,
+        index: int,
+        text: str,
         image_path: Path,
         audio_path: Path,
         output_path: Path,
         resolution: str,
         fps: int,
+        motion: dict[str, Any] | None = None,
     ) -> None:
-        """Render a single scene video clip from a static image (legacy workflow)."""
-        duration = scene.actual_duration or scene.duration_hint or 3.0
+        """Render a single subtitle clip from a static image (legacy workflow)."""
+        durations = getattr(self, "_subtitle_durations", {})
+        duration = durations.get(index, 3.0)
         width, height = self._parse_resolution(resolution)
 
-        vf = self._build_ken_burns_filter(scene, width, height, duration, fps)
+        motion = motion or {"type": "ken_burns", "end": "zoom_1.15_pan_0_0"}
+        vf = self._build_ken_burns_filter(motion, width, height, duration, fps)
 
         args = [
             "-loop", "1",
@@ -148,7 +159,6 @@ class VideoAssembler:
         )
 
         if source_duration >= shot_duration:
-            # Trim to exact duration
             args = [
                 "-i", str(video_path),
                 "-t", str(shot_duration),
@@ -157,7 +167,6 @@ class VideoAssembler:
                 str(output_path),
             ]
         else:
-            # Loop to reach target duration, then trim
             filter_complex = (
                 "[0:v]loop=loop=-1:size=1:start=0[looped];"
                 f"[looped]trim=duration={shot_duration}[trimmed]"
@@ -174,14 +183,12 @@ class VideoAssembler:
         self._run_ffmpeg(args)
 
     def _compute_shot_durations(self, script: Script) -> dict[int, float]:
-        """Compute total duration for each shot from scene actual durations."""
-        durations: dict[int, float] = {}
+        """Compute total duration for each shot from subtitle durations."""
+        durations = getattr(script, "_subtitle_durations", {})
+        result: dict[int, float] = {}
         for shot in script.shots:
-            scenes = script.scenes_for_shot(shot)
-            durations[shot.shot_id] = sum(
-                s.actual_duration or s.duration_hint or 3.0 for s in scenes
-            )
-        return durations
+            result[shot.shot_id] = script.shot_duration(shot, durations)
+        return result
 
     def _build_subtitle_style(self, style: dict[str, Any] | None) -> str:
         """Build FFmpeg subtitles force_style string from metadata style."""
@@ -241,7 +248,6 @@ class VideoAssembler:
                 str(output_path),
             ]
         else:
-            # Neither BGM nor subtitles; just copy the assembled video.
             shutil.copy2(str(video_path), str(output_path))
             return
 
@@ -254,36 +260,42 @@ class VideoAssembler:
         bgm_path: Path | None,
         output_path: Path,
     ) -> Path:
-        """Legacy image-based assembly."""
+        """Legacy image-based assembly (one image per subtitle)."""
         images_dir = Path(self.config.IMAGES_DIR)
         audio_dir = Path(self.config.AUDIO_DIR)
 
-        scene_files: list[Path] = []
+        clip_files: list[Path] = []
         with tempfile.TemporaryDirectory() as tmpdir:
             prev_image_path: Path | None = None
-            for scene in script.scenes:
-                image_path = images_dir / f"scene_{scene.scene_id}.png"
-                audio_path = audio_dir / f"scene_{scene.scene_id}.mp3"
-                scene_output = Path(tmpdir) / f"scene_{scene.scene_id}.mp4"
+            for index, text in enumerate(script.subtitles):
+                image_path = images_dir / f"scene_{index}.png"
+                audio_path = audio_dir / f"subtitle_{index}.mp3"
+                clip_output = Path(tmpdir) / f"subtitle_{index}.mp4"
 
-                if scene.hold_image and prev_image_path:
-                    image_path = prev_image_path
-                    logger.info("Scene %s uses held image from %s", scene.scene_id, image_path.name)
-                elif not image_path.exists():
-                    raise FileNotFoundError(f"Image not found: {image_path}")
+                if not image_path.exists():
+                    if prev_image_path:
+                        image_path = prev_image_path
+                        logger.info("Subtitle %s uses held image from %s", index, image_path.name)
+                    else:
+                        raise FileNotFoundError(f"Image not found: {image_path}")
 
                 if not audio_path.exists():
                     raise FileNotFoundError(f"Audio not found: {audio_path}")
 
-                self._render_legacy_scene(
-                    scene, image_path, audio_path, scene_output,
-                    script.metadata.resolution, script.metadata.fps,
+                self._render_legacy_subtitle(
+                    index,
+                    text,
+                    image_path,
+                    audio_path,
+                    clip_output,
+                    script.metadata.resolution,
+                    script.metadata.fps,
                 )
-                scene_files.append(scene_output)
+                clip_files.append(clip_output)
                 prev_image_path = image_path
 
             assembled_path = Path(tmpdir) / "assembled.mp4"
-            self._concat_files(scene_files, assembled_path)
+            self._concat_files(clip_files, assembled_path)
             subtitle_for_burn = subtitle_path if script.metadata.burn_subtitles else None
             self._add_bgm_and_subtitles(
                 assembled_path, subtitle_for_burn, output_path, bgm_path,
@@ -317,10 +329,10 @@ class VideoAssembler:
             video_only_path = tmpdir_path / "video_only.mp4"
             self._concat_files(prepared_shot_files, video_only_path)
 
-            # 3. Concatenate scene audios
+            # 3. Concatenate subtitle audios
             audio_files: list[Path] = []
-            for scene in script.scenes:
-                audio_path = audio_dir / f"scene_{scene.scene_id}.mp3"
+            for index, _ in enumerate(script.subtitles):
+                audio_path = audio_dir / f"subtitle_{index}.mp3"
                 if not audio_path.exists():
                     raise FileNotFoundError(f"Audio not found: {audio_path}")
                 audio_files.append(audio_path)
@@ -386,11 +398,11 @@ class VideoAssembler:
 
         return output_path
 
-    def _concatenate_scene_audios(self, script: Script) -> Path:
-        """Concatenate all scene audio files into one MP3."""
+    def _concatenate_subtitle_audios(self, script: Script) -> Path:
+        """Concatenate all subtitle audio files into one MP3."""
         audio_files: list[Path] = []
-        for scene in script.scenes:
-            audio_path = Path(self.config.AUDIO_DIR) / f"scene_{scene.scene_id}.mp3"
+        for index, _ in enumerate(script.subtitles):
+            audio_path = Path(self.config.AUDIO_DIR) / f"subtitle_{index}.mp3"
             if not audio_path.exists():
                 raise FileNotFoundError(f"Audio not found: {audio_path}")
             audio_files.append(audio_path)
@@ -413,7 +425,7 @@ class VideoAssembler:
 
         if scene_clips:
             logger.info("Assembling from pre-rendered clips")
-            audio_path = self._concatenate_scene_audios(script)
+            audio_path = self._concatenate_subtitle_audios(script)
             self._assemble_from_clips(
                 scene_clips,
                 audio_path,

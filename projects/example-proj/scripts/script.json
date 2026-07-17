@@ -1,63 +1,4 @@
 {
-  "scenes": [
-    {
-      "scene_id": 1,
-      "subtitle": "清晨，阳光洒落在宁静的湖面上。",
-      "image_prompt": "日出时宁静的山间湖泊，金色阳光倒映在水面上",
-      "use_reference_image": false,
-      "reference_from": null,
-      "hold_image": false,
-      "duration_hint": 5,
-      "motion": {
-        "type": "ken_burns",
-        "start": "zoom_1.0_pan_0_0",
-        "end": "zoom_1.12_pan_0.02_0"
-      },
-      "voice": {
-        "voice_id": "zh-CN-YunxiNeural",
-        "speed": 1.0,
-        "emotion": "neutral"
-      }
-    },
-    {
-      "scene_id": 2,
-      "subtitle": "远处的山峦被薄雾轻轻笼罩。",
-      "image_prompt": "平静的湖泊被远处雾气弥漫的山峦环绕，晨雾",
-      "use_reference_image": true,
-      "reference_from": "prev",
-      "hold_image": false,
-      "duration_hint": 5,
-      "motion": {
-        "type": "ken_burns",
-        "start": "zoom_1.05_pan_-0.02_0",
-        "end": "zoom_1.15_pan_0.02_0"
-      },
-      "voice": {
-        "voice_id": "zh-CN-YunxiNeural",
-        "speed": 1.0,
-        "emotion": "neutral"
-      }
-    },
-    {
-      "scene_id": 3,
-      "subtitle": "一只小船静静地划过水面，留下细细的波纹。",
-      "image_prompt": "一艘小木船滑过湖面，水面上泛起细微波纹",
-      "use_reference_image": true,
-      "reference_from": "prev",
-      "hold_image": false,
-      "duration_hint": 6,
-      "motion": {
-        "type": "ken_burns",
-        "start": "zoom_1.0_pan_0_0",
-        "end": "zoom_1.1_pan_-0.03_0.01"
-      },
-      "voice": {
-        "voice_id": "zh-CN-YunxiNeural",
-        "speed": 1.0,
-        "emotion": "neutral"
-      }
-    }
-  ],
   "metadata": {
     "title": "宁静湖畔",
     "target_duration": 20,
@@ -69,9 +10,52 @@
     "music_mood": "calm, inspiring",
     "music_source": "stock",
     "tags": ["风景", "宁静", "湖畔", "治愈"],
+    "workflow": "shot",
+    "video_model": "doubao-seedance-1-0-pro-250528",
+    "video_resolution": "720p",
+    "video_watermark": false,
+    "voice": {
+      "voice_id": "zh-CN-YunxiNeural",
+      "speed": 1.0,
+      "emotion": "neutral"
+    },
     "cover_image": {
       "prompt": "宁静的湖面倒映着日出，远处山峦若隐若现",
       "text": "这一刻，世界安静了"
     }
-  }
+  },
+  "subtitles": [
+    "清晨，阳光洒落在宁静的湖面上。",
+    "远处的山峦被薄雾轻轻笼罩。",
+    "一只小船静静地划过水面，留下细细的波纹。"
+  ],
+  "shots": [
+    {
+      "shot_id": 1,
+      "subtitle_indices": [0],
+      "start_frame_prompt": "日出时宁静的山间湖泊，金色阳光倒映在水面上",
+      "video_motion_prompt": "镜头缓慢推进，阳光在水面轻轻闪烁",
+      "use_reference_image": false,
+      "reference_from": null,
+      "hold_video": false
+    },
+    {
+      "shot_id": 2,
+      "subtitle_indices": [1],
+      "start_frame_prompt": "平静的湖泊被远处雾气弥漫的山峦环绕，晨雾",
+      "video_motion_prompt": "镜头微微平移，薄雾在山间缓慢流动",
+      "use_reference_image": true,
+      "reference_from": "prev",
+      "hold_video": false
+    },
+    {
+      "shot_id": 3,
+      "subtitle_indices": [2],
+      "start_frame_prompt": "一艘小木船滑过湖面，水面上泛起细微波纹",
+      "video_motion_prompt": "小船从左向右缓缓划过，水面波纹扩散",
+      "use_reference_image": true,
+      "reference_from": "prev",
+      "hold_video": false
+    }
+  ]
 }

@@ -8,9 +8,8 @@ from pathlib import Path
 from inkflow_core.models import Script
 from inkflow_core.types import WorkflowOutput
 from inkflow_generators.cover import CoverGenerator
-from inkflow_generators.image.shot_frame import ShotFrameGenerator
 from inkflow_generators.subtitle import SubtitleGenerator
-from inkflow_remotion import AssetManager, CompositionBuilder, RemotionRenderer
+from inkflow_remotion import AssetFetcher, CompositionBuilder, FetchedAsset, RemotionRenderer
 
 from .base import Workflow, WorkflowRegistry
 
@@ -23,37 +22,28 @@ class InfographicWorkflow(Workflow):
 
     name = "infographic"
 
-    def _ensure_shot_prompts(self, script: Script) -> None:
-        """Populate empty start_frame_prompt fields for infographic shots."""
-        for shot in script.shots:
-            if shot.start_frame_prompt:
-                continue
-            scenes = script.scenes_for_shot(shot)
-            text_summary = "，".join(s.subtitle for s in scenes)
-            shot.start_frame_prompt = f"信息图背景画面：{text_summary}"
-
     async def run(self, script: Script) -> WorkflowOutput:
         """Render infographic video via Remotion."""
         logger.info("Using infographic (Remotion) workflow")
 
-        # 1. Ensure every shot has an image prompt, then generate Seedream images.
-        logger.info("Step 3/5: Generating Seedream base images...")
-        self._ensure_shot_prompts(script)
-        with ShotFrameGenerator(self.config, self.cost_tracker) as frame_gen:
-            frame_gen.generate(script)
+        # 1. Resolve all assets and copy them into Remotion public/.
+        logger.info("Step 3/5: Fetching assets for infographic...")
+        fetched_assets: dict[int, list[FetchedAsset]] = {}
+        with AssetFetcher(self.config) as fetcher:
+            fetcher.prepare_public_dir()
+            for index in range(len(script.shots)):
+                fetched_assets[index] = fetcher.fetch_for_shot(script, index)
+            fetcher.write_manifest(script)
 
         # 2. Generate cover images.
         logger.info("Generating cover images...")
         with CoverGenerator(self.config, self.cost_tracker) as cover_gen:
             cover_gen.generate(script)
 
-        # 3. Prepare Remotion public/ assets and composition.json.
+        # 3. Build Remotion composition.json.
         logger.info("Step 4/5: Building Remotion composition...")
-        asset_manager = AssetManager(self.config)
-        asset_manager.prepare(script)
-
         composer = CompositionBuilder(script, self.config)
-        composer.write()
+        composer.write(fetched_assets)
 
         # 4. Render each shot composition.
         logger.info("Rendering Remotion clips...")

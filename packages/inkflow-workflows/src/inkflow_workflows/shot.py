@@ -26,17 +26,17 @@ class ShotWorkflow(Workflow):
     def _compute_shot_durations(self, script: Script) -> dict[int, int]:
         """Compute target video duration in seconds for each shot.
 
-        The duration is the sum of actual scene durations rounded up to the
+        The duration is the sum of actual subtitle durations rounded up to the
         nearest integer and capped at the model's per-clip limit (12s).
         """
         max_duration = 12
-        durations: dict[int, int] = {}
+        durations = getattr(script, "_subtitle_durations", {})
+        result: dict[int, int] = {}
         for shot in script.shots:
-            scenes = script.scenes_for_shot(shot)
-            total = sum(s.actual_duration or s.duration_hint or 3.0 for s in scenes)
+            total = script.shot_duration(shot, durations)
             rounded = int(total) + (1 if total % 1 > 0 else 0)
-            durations[shot.shot_id] = min(max(rounded, 1), max_duration)
-        return durations
+            result[shot.shot_id] = min(max(rounded, 1), max_duration)
+        return result
 
     def _build_last_frame_map(
         self, script: Script, start_frame_map: dict[int, Path]

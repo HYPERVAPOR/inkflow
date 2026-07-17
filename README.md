@@ -2,7 +2,7 @@
 
 AI 视频生成 Workflow。
 
-根据项目目录下的 `script.json` 自动生成画面、配音、字幕，并合成最终视频。
+根据项目目录下的 `script.md`（或 `script.json`）自动生成画面、配音、字幕，并合成最终视频。
 
 支持三种工作流：
 - **Legacy**: 静态图片 + Ken Burns
@@ -13,7 +13,7 @@ AI 视频生成 Workflow。
 
 ### 1. 安装依赖
 
-本项目使用 [uv](https://docs.astral.sh/uv/) 管理 Python 依赖，使用 npm 管理 Remotion 依赖。
+本项目使用 [uv](https://docs.astral.sh/uv/) 管理 Python 依赖，使用 pnpm 管理 Remotion 依赖。
 
 ```bash
 # Python 依赖
@@ -46,16 +46,16 @@ TTS 使用 Edge TTS，完全免费，无需额外配置。
 ```text
 projects/example-proj/
 ├── scripts/
-│   ├── script.json              # 默认脚本
-│   └── script_infographic.json  # 信息图示例脚本
+│   ├── script.md              # 默认脚本（声明式 Markdown 格式）
+│   └── script.json            # JSON 格式脚本
 ├── assets/
-│   ├── images/                  # 生成的画面
-│   ├── videos/                  # 生成的视频片段
-│   ├── audio/                   # 生成的配音
-│   ├── music/                   # 背景音乐（可选）
-│   └── subtitles/               # 生成的字幕
-├── output/                      # 最终视频
-└── logs/                        # 运行日志
+│   ├── images/                # 生成的画面
+│   ├── videos/                # 生成的视频片段
+│   ├── audio/                 # 生成的配音
+│   ├── music/                 # 背景音乐（可选）
+│   └── subtitles/             # 生成的字幕
+├── output/                    # 最终视频
+└── logs/                      # 运行日志
 ```
 
 示例项目已放在 `projects/example-proj/`，可直接使用或复制一份改名字：
@@ -67,11 +67,11 @@ cp -r projects/example-proj projects/my_video
 ### 4. 生成视频
 
 ```bash
-# 默认脚本（legacy 或 shot）
+# 默认使用 script.md（不存在则回退到 script.json）
 uv run inkflow projects/example-proj
 
-# 信息图示例
-uv run inkflow projects/example-proj --script scripts/script_infographic.json
+# 指定 JSON 脚本
+uv run inkflow projects/example-proj --script scripts/script.json
 ```
 
 运行结束后会生成成本报告：`projects/example-proj/logs/cost.json`。
@@ -110,12 +110,43 @@ uv run inkflow projects/example-proj --step video
 ├── projects/                # 视频项目目录
 │   └── example-proj/
 ├── pyproject.toml
-└── .env.example
+├── .env.example
+└── AGENTS.md
 ```
+
+## 脚本格式
+
+脚本只有三块：`metadata`、`subtitles`、`shots`。
+
+- `subtitles`: 旁白/字幕文本列表。
+- `shots`: 连续视觉镜头，通过 `subtitle_indices` 引用字幕行。
+- `shots[n].visual`: 用自然语言 `description` + 声明式 `assets` 描述画面。
+- Remotion composition 由 `VisualPlanner` 自动生成，**不由用户手写**。
+
+推荐使用 `script.md`：
+
+```markdown
+---
+title: "数据增长故事"
+resolution: "1080x1920"
+workflow: "infographic"
+---
+
+# 1
+2023 年，用户一千人
+2024 年，暴涨到一万人
+
+画面：深蓝科技信息图，展示两年用户增长的柱状图
+
+素材：
+- seedream_image: 深蓝科技感背景，数据增长主题
+```
+
+详见 `AGENTS.md`。
 
 ## 工作流选择
 
-在 `script.json` 的 `metadata` 中指定：
+在 `metadata` 中指定：
 
 ```json
 {

@@ -146,8 +146,8 @@
 
 ## 4. 画面节奏
 
-- 每个 scene 停留 2.5–4 秒。
-- 每个 shot 总时长不要超过 12 秒（Seedance 单段上限）。
+- 每个 shot 尽量控制在 5 秒以内。
+- 每个 shot 总时长不要超过 12 秒（Seedance 单段上限；Remotion 信息图无此限制，但仍建议保持快节奏）。
 - 可以把 2–4 句相关台词合并到一个 shot，避免 PPT 式切换。
 - 每句台词对应具体视觉意象。
 - 高潮场景（打斗、对决、反转）可以适当放慢，用 1–2 个长 shot 强化张力。
@@ -164,30 +164,31 @@
 
 ## 6. 脚本创作流程（分四步 + 用户审阅）
 
-脚本不是一次性写成最终 `script.json`，而是分步完成，确保画面、运动与叙事上下文一致。
+脚本不是一次性写成最终 `script.md` / `script.json`，而是分步完成，确保画面、运动与叙事上下文一致。
 
 **第零步：输出纯文本脚本供用户审阅（新增）**
 
-在写 `script.json` 之前，先交付一份只有台词文本的纯文本脚本：
+在写脚本之前，先交付一份只有台词文本的纯文本脚本：
 
 - 文件路径：`projects/<name>/scripts/script_text.md`
-- 内容只包含旁白/字幕文本，每句一行，不标注时间戳，不写 `start_frame_prompt` 或 `video_motion_prompt`。
+- 内容只包含旁白/字幕文本，每句一行，不标注时间戳，不写画面描述或素材。
 - 目标时长 2 分钟以上，信息密度高，钩子前置。
 - **必须等用户确认文本后，再继续下一步。**
 
 > **为什么这样做**：画面和运动提示词生成成本高、修改麻烦。如果台词本身方向不对，越早返工成本越低。纯文本审阅是防止"生成完才发现故事不对"的关键防线。
 
-**第一步：纯文本剧本**
+**第一步：转换为脚本**
 
-用户确认 `script_text.md` 后，将其转换为 `script.json` 的 `scenes` 数组：
+用户确认 `script_text.md` 后，将其转换为 `script.md`（或 `script.json`）：
 
-- 每一句台词对应一个 `scene`。
-- 只填 `scene_id`、`subtitle`、`duration_hint`，**不写 `start_frame_prompt` 或 `video_motion_prompt`**。
-- 暂时不决定 shot 划分。
+- 顶层只有 `metadata`、`subtitles`、`shots` 三块。
+- `subtitles` 列表：每一句台词对应一项。
+- `shots` 列表：先只填 `shot_id` 和 `subtitle_indices`，**不写 `visual.description` 和 `assets`**。
+- 暂时用 `duration_hint`（JSON）或直接跑 TTS 拿到真实时长。
 
 **第二步：划分 shot**
 
-根据画面连续性与节奏，把 scene 分组为 shot。原则：
+根据画面连续性与节奏，把字幕分组为 shot。原则：
 
 - 同一空间、同一主体、同一情绪弧的连续台词放进一个 shot。
 - 每个 shot 总时长按 `duration_hint` 估算，控制在 12 秒以内。
@@ -198,26 +199,27 @@
 写完 shot 分组和台词后，先跑音频：
 
 ```bash
-uv run python main.py projects/<name> --step audio
+uv run inkflow projects/<name> --step audio
 ```
 
 跑完后查看 `logs/script_with_duration.json`，得到每句台词的真实秒数。然后：
 
-- 把同一 shot 下所有 scene 的 `actual_duration` 相加，得到真实 shot 时长。
+- 把同一 shot 下所有字幕的真实时长相加，得到真实 shot 时长。
 - 如果某个 shot **超过 12 秒**，必须拆 shot 或精简台词。
-- 把真实时长写回 `script.json` 的 `duration_hint`，方便下次直接读取。
+- 把真实时长写回 `script.json` 的 `duration_hint`（JSON 格式时），方便下次直接读取。
 
-> **必须做这一步**：`duration_hint` 只是估算，TTS 真实时长可能更长。如果不先验证，Seedance 生成 12 秒视频后，后面合成时只能靠循环/裁剪硬对齐，效果会变差。
+> **必须做这一步**：估算时长可能偏短。如果不先验证，Seedance 生成 12 秒视频后，后面合成时只能靠循环/裁剪硬对齐，效果会变差。
 
-**第四步：补全画面与运动提示词**
+**第四步：补全画面描述与素材**
 
-确认 shot 分组和时长都 OK 后，再补全 `start_frame_prompt` 和 `video_motion_prompt`：
+确认 shot 分组和时长都 OK 后，再补全每个 shot 的 `visual.description` 和 `assets`：
 
 | 策略 | 字段 | 说明 |
 | --- | --- | --- |
-| **复用视频片段** | `hold_video: true` | 当前 shot 与上一 shot 画面几乎不变，只换台词，复用同一段视频。 |
-| **全新 shot** | `use_reference_image: false`, `hold_video: false` | 需要全新的视觉意象。 |
-| **图生图参考** | `use_reference_image: true`, `reference_from: "prev"` | 当前 shot 与上一 shot 在视觉上有**关联性或连续性**，例如同一人物换表情、同一场景加物件、同一空间换机位。参考指令要明确写出变化，如"给这张图片增加一个穿白大褂的男人"、"让这个人露出开心的表情"。 |
+| **复用视频片段** | `hold_video: true` | 当前 shot 与上一 shot 画面几乎不变，只换台词，复用同一段视频。仅 shot 工作流。 |
+| **全新 shot** | `use_reference_image: false`, `hold_video: false` | 需要全新的视觉意象。仅 shot 工作流。 |
+| **图生图参考** | `use_reference_image: true`, `reference_from: "prev"` | 当前 shot 与上一张图保持视觉连续性。仅 shot 工作流。 |
+| **信息图 shot** | `visual.description` + `visual.assets` | 用自然语言描述画面，系统会自动生成 Remotion composition。 |
 
 判断 shot 策略时要考虑前后 2–3 句的上下文，避免同一人物或场景被反复切镜头。
 
@@ -227,21 +229,21 @@ uv run python main.py projects/<name> --step audio
 
 ### 7.1 语言
 
-- 所有 `start_frame_prompt` 和 `video_motion_prompt` 默认**用中文撰写**，如果用户要求，则使用英文。
+- 所有画面描述默认**用中文撰写**，如果用户要求，则使用英文。
 
 ### 7.2 内容
 
-- `start_frame_prompt` 只描述**首帧画面内容**：主体、动作、场景、构图、情绪。
-- `video_motion_prompt` 只描述**运动**：镜头怎么动、主体怎么动、环境如何变化。
-- **禁止**在提示词里写风格词，例如"涂鸦风格""手绘""线条画""油画""写实""卡通""白色背景""电影感镜头"等。
-- 画风、笔触、色调、背景质感由 `metadata.style_prompt` 和项目根目录的 `visual-reference.png` 统一控制，避免单句提示词覆盖全局画风。
+- **Shot 工作流**：`start_frame_prompt` 只描述首帧画面内容（主体、动作、场景、构图、情绪）；`video_motion_prompt` 只描述运动（镜头/主体/环境如何动）。
+- **信息图工作流**：`visual.description` 只描述画面要什么（如"展示两年用户增长的柱状图"、"向上箭头与增长曲线"），不写具体实现。
+- **禁止**在描述里写风格词，例如"涂鸦风格""手绘""线条画""油画""写实""卡通""白色背景""电影感镜头"等。
+- 画风、笔触、色调、背景质感由 `metadata.style_prompt` 和项目根目录的 `visual-reference.png` 统一控制，避免单句描述覆盖全局画风。
 - 参考上一张图时，提示词只需说明"发生了什么变化"，同样不写风格。
 
 ### 7.3 系统级动画风格提示词 `video_system_prompt`
 
 - `metadata.video_system_prompt` 用于统一全片动画系统，例如："传统手绘动画风格，拍二动画，低帧率，断奏动作，可见的铅笔纹理，粗线条艺术，逐帧美感"。
-- 该字段会自动追加到每条 `start_frame_prompt`、`video_motion_prompt`、legacy `image_prompt` 和封面图 prompt 的**前面**，不需要在每个 shot/scene 里重复写。
-- `start_frame_prompt` 和 `video_motion_prompt` 仍然只写内容/运动，不写风格词；系统级风格由 `video_system_prompt` 和 `style_prompt` 共同承担。
+- 该字段会自动追加到 shot 工作流的 `start_frame_prompt`、`video_motion_prompt`、legacy 图片 prompt 和封面图 prompt 的**前面**，不需要在每个 shot 里重复写。
+- 画面描述仍然只写内容/运动，不写风格词；系统级风格由 `video_system_prompt` 和 `style_prompt` 共同承担。
 
 ---
 
@@ -259,7 +261,7 @@ uv run python main.py projects/<name> --step audio
 - `use_reference_image: true` + `reference_from: "prev"`：当前 shot 的首帧需要与上一张图保持**视觉连续性**（如人物换表情、同场景加物件）。此时会用上一张图覆盖全局画风参考图，优先保证画面连续性。
 - 不依赖上一张图的 shot 会并发生成，提升效率；依赖 `prev` 的 shot 按顺序串行生成。
 - 并发数通过环境变量 `SEEDREAM_MAX_WORKERS` 配置，默认 `32`。Seedream 文档标注的限流为 **500 IPM（张 / 分钟）**，可根据网络情况和账号配额调整，但不要超过该上限。
-- 画面规划完成后，再生成最终 `script.json`。
+- 画面规划完成后，再生成最终 `script.md` / `script.json`。
 
 ---
 

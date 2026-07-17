@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 
 @WorkflowRegistry.register
 class LegacyWorkflow(Workflow):
-    """Generate a video from static scene images with Ken Burns motion."""
+    """Generate a video from static images with Ken Burns motion.
+
+    In the new declarative format, "legacy" means there are no shots defined.
+    Each subtitle line gets its own generated image.
+    """
 
     name = "legacy"
 
@@ -27,7 +31,7 @@ class LegacyWorkflow(Workflow):
 
         logger.info("Step 3/5: Generating images...")
         with ImageGenerator(self.config, self.cost_tracker) as image_gen:
-            image_gen.generate(script)
+            image_gen.generate_for_script(script)
 
         logger.info("Generating cover images...")
         with CoverGenerator(self.config, self.cost_tracker) as cover_gen:

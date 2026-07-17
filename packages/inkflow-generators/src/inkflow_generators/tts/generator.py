@@ -12,7 +12,7 @@ from pathlib import Path
 import edge_tts
 import httpx
 from inkflow_core.config import Config
-from inkflow_core.models import Scene, Script
+from inkflow_core.models import Script, Voice
 from pydub import AudioSegment  # type: ignore[import-untyped]
 
 from inkflow_generators.cost import CostTracker
@@ -21,8 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 # Verified Chinese voices for Volcano TTS.
-# v3 seed-tts-2.0 speakers must end with `_uranus_bigtts` (or `_saturn_bigtts`
-# for some accounts). v1 seed-tts-1.0 speakers must end with `_moon_bigtts`.
 VOLCANO_VOICES_V3: dict[str, str] = {
     "zh_male_dayi_uranus_bigtts": "大壹 2.0",
     "zh_female_vv_uranus_bigtts": "Vivi 2.0",
@@ -53,113 +51,100 @@ VOLCANO_VOICES_V1: dict[str, str] = {
     "zh_male_yangguangqingnian_moon_bigtts": "阳光青年",
 }
 
-# Default voice list used by the sample generator.
 VOLCANO_VOICES = VOLCANO_VOICES_V3
 
 
 class TTSGenerator:
-    """Generate audio for all scenes using Edge TTS or Volcano TTS."""
+    """Generate audio for all subtitle lines using Edge TTS or Volcano TTS."""
 
     def __init__(self, config: Config, cost_tracker: CostTracker | None = None) -> None:
         self.config = config
         self.cost_tracker = cost_tracker
         self._volcano_sem = asyncio.Semaphore(config.VOLCANO_TTS_MAX_WORKERS)
 
-    def _provider_for_scene(self, scene: Scene, script: Script) -> str:
-        """Select TTS provider for a scene.
+    def _provider(self, voice: Voice) -> str:
+        """Select TTS provider."""
+        return voice.provider or self.config.TTS_PROVIDER
 
-        Priority: scene.voice.provider -> metadata.voice.provider -> config.TTS_PROVIDER.
-        """
-        return (
-            (scene.voice.provider if scene.voice else None)
-            or script.metadata.voice.provider
-            or self.config.TTS_PROVIDER
-        )
-
-    def _voice_for_scene(self, scene: Scene, script: Script, provider: str) -> str:
-        """Determine TTS voice/speaker for a scene."""
-        voice_id = (
-            (scene.voice.voice_id if scene.voice else None)
-            or script.metadata.voice.voice_id
-        )
-        if voice_id:
-            return voice_id
+    def _voice_id(self, voice: Voice, provider: str) -> str:
+        """Determine TTS voice/speaker."""
+        if voice.voice_id:
+            return voice.voice_id
         return (
             self.config.VOLCANO_TTS_VOICE
             if provider == "volcano"
             else self.config.TTS_VOICE
         )
 
-    def _speed_for_scene(self, scene: Scene, script: Script) -> float:
-        """Determine speech speed multiplier for a scene."""
-        if scene.voice is not None:
-            return scene.voice.speed
-        return script.metadata.voice.speed
+    def _speed(self, voice: Voice) -> float:
+        """Determine speech speed multiplier."""
+        return voice.speed
 
     def _edge_rate(self, speed: float) -> str:
         """Convert a speed multiplier to an Edge TTS rate string."""
-        # 1.0 -> +0%, 1.5 -> +50%, 0.8 -> -20%
         return f"{int(round((speed - 1.0) * 100)):+d}%"
 
     async def _generate_edge(
         self,
-        scene: Scene,
-        script: Script,
+        index: int,
+        text: str,
+        voice: Voice,
         output_path: Path,
     ) -> None:
-        """Generate a scene's audio using Edge TTS."""
-        voice = self._voice_for_scene(scene, script, "edge_tts")
-        rate = self._edge_rate(self._speed_for_scene(scene, script))
+        """Generate a subtitle's audio using Edge TTS."""
+        tts_voice = self._voice_id(voice, "edge_tts")
+        rate = self._edge_rate(self._speed(voice))
         logger.info(
-            "Generating Edge TTS for scene %s with voice %s rate %s",
-            scene.scene_id,
-            voice,
+            "Generating Edge TTS for subtitle %s with voice %s rate %s",
+            index,
+            tts_voice,
             rate,
         )
 
-        communicate = edge_tts.Communicate(scene.subtitle, voice, rate=rate)
+        communicate = edge_tts.Communicate(text, tts_voice, rate=rate)
         await communicate.save(str(output_path))
 
-        logger.info("Saved Edge TTS audio for scene %s", scene.scene_id)
+        logger.info("Saved Edge TTS audio for subtitle %s", index)
         if self.cost_tracker:
             self.cost_tracker.log_tts(
-                model=f"edge-tts-{voice}",
-                text=scene.subtitle,
-                note=f"scene_id={scene.scene_id}, voice={voice}, rate={rate}",
+                model=f"edge-tts-{tts_voice}",
+                text=text,
+                note=f"subtitle_index={index}, voice={tts_voice}, rate={rate}",
             )
 
     async def _generate_volcano(
         self,
-        scene: Scene,
-        script: Script,
+        index: int,
+        text: str,
+        voice: Voice,
         output_path: Path,
     ) -> None:
-        """Generate a scene's audio using the configured Volcano TTS endpoint."""
+        """Generate a subtitle's audio using the configured Volcano TTS endpoint."""
         async with self._volcano_sem:
-            voice = self._voice_for_scene(scene, script, "volcano")
-            speed = self._speed_for_scene(scene, script)
+            tts_voice = self._voice_id(voice, "volcano")
+            speed = self._speed(voice)
             logger.info(
-                "Generating Volcano TTS for scene %s with voice %s speed %.2f",
-                scene.scene_id,
-                voice,
+                "Generating Volcano TTS for subtitle %s with voice %s speed %.2f",
+                index,
+                tts_voice,
                 speed,
             )
 
             if "/api/v1/tts" in self.config.VOLCANO_TTS_BASE_URL:
-                await self._generate_volcano_v1(scene, script, output_path, voice, speed)
+                await self._generate_volcano_v1(index, text, output_path, tts_voice, speed)
             else:
-                await self._generate_volcano_v3(scene, script, output_path, voice, speed)
+                await self._generate_volcano_v3(index, text, output_path, tts_voice, speed)
 
     async def _generate_volcano_v1(
         self,
-        scene: Scene,
-        script: Script,
+        index: int,
+        text: str,
         output_path: Path,
         voice: str,
         speed: float,
     ) -> None:
         """Generate audio using the legacy Volcano TTS v1 HTTP endpoint."""
-        logger.info("Using Volcano TTS v1 endpoint for scene %s", scene.scene_id)
+        logger.info("Using Volcano TTS v1 endpoint for subtitle %s", index)
 
         headers = {
             "Content-Type": "application/json",
@@ -181,7 +166,7 @@ class TTSGenerator:
             },
             "request": {
                 "reqid": str(uuid.uuid4()),
-                "text": scene.subtitle,
+                "text": text,
                 "text_type": "plain",
                 "operation": "query",
                 "with_frontend": 1,
@@ -218,25 +203,25 @@ class TTSGenerator:
             audio_b64 = data.get("data")
             if not audio_b64:
                 raise RuntimeError(
-                    f"Volcano TTS v1 returned empty audio for scene {scene.scene_id}"
+                    f"Volcano TTS v1 returned empty audio for subtitle {index}"
                 )
 
             audio_bytes = base64.b64decode(audio_b64)
 
         output_path.write_bytes(audio_bytes)
-        logger.info("Saved Volcano TTS v1 audio for scene %s", scene.scene_id)
+        logger.info("Saved Volcano TTS v1 audio for subtitle %s", index)
 
         if self.cost_tracker:
             self.cost_tracker.log_tts(
                 model=f"volcano-tts-v1-{voice}",
-                text=scene.subtitle,
-                note=f"scene_id={scene.scene_id}, voice={voice}, speed={speed}",
+                text=text,
+                note=f"subtitle_index={index}, voice={voice}, speed={speed}",
             )
 
     async def _generate_volcano_v3(
         self,
-        scene: Scene,
-        script: Script,
+        index: int,
+        text: str,
         output_path: Path,
         voice: str,
         speed: float,
@@ -257,14 +242,12 @@ class TTSGenerator:
                 "X-Api-Resource-Id": self.config.VOLCANO_TTS_RESOURCE_ID,
                 "X-Api-Request-Id": str(uuid.uuid4()),
             }
-        # Map speed multiplier to Volcano v3 speech_rate: 1.0 -> 0, 1.2 -> 20,
-        # 0.5 -> -50, 2.0 -> 100. Clamp to [-50, 100].
         speech_rate = int(round((speed - 1.0) * 100))
         speech_rate = max(-50, min(100, speech_rate))
         payload = {
             "user": {"uid": "inkflow"},
             "req_params": {
-                "text": scene.subtitle,
+                "text": text,
                 "speaker": voice,
                 "audio_params": {
                     "format": "mp3",
@@ -313,60 +296,67 @@ class TTSGenerator:
 
         if not audio_bytes:
             raise RuntimeError(
-                f"Volcano TTS v3 returned empty audio for scene {scene.scene_id}"
+                f"Volcano TTS v3 returned empty audio for subtitle {index}"
             )
 
         output_path.write_bytes(audio_bytes)
-        logger.info("Saved Volcano TTS v3 audio for scene %s", scene.scene_id)
+        logger.info("Saved Volcano TTS v3 audio for subtitle %s", index)
 
         if self.cost_tracker:
             self.cost_tracker.log_tts(
                 model=f"volcano-tts-v3-{voice}",
-                text=scene.subtitle,
-                note=f"scene_id={scene.scene_id}, voice={voice}, speed={speed}",
+                text=text,
+                note=f"subtitle_index={index}, voice={voice}, speed={speed}",
             )
 
     async def _generate_one(
         self,
-        scene: Scene,
-        script: Script,
+        index: int,
+        text: str,
+        voice: Voice,
         output_dir: Path,
     ) -> Path:
-        """Generate audio for a single scene using its configured provider."""
-        output_path = output_dir / f"scene_{scene.scene_id}.mp3"
+        """Generate audio for a single subtitle line."""
+        output_path = output_dir / f"subtitle_{index}.mp3"
         if output_path.exists():
-            logger.info("Audio already exists for scene %s", scene.scene_id)
+            logger.info("Audio already exists for subtitle %s", index)
             return output_path
 
-        provider = self._provider_for_scene(scene, script)
+        provider = self._provider(voice)
         if provider == "volcano":
-            await self._generate_volcano(scene, script, output_path)
+            await self._generate_volcano(index, text, voice, output_path)
         else:
-            await self._generate_edge(scene, script, output_path)
+            await self._generate_edge(index, text, voice, output_path)
 
         return output_path
 
     async def generate(self, script: Script) -> dict[int, Path]:
-        """Generate audio for all scenes concurrently."""
+        """Generate audio for all subtitle lines concurrently."""
         output_dir = Path(self.config.AUDIO_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        tasks = [self._generate_one(scene, script, output_dir) for scene in script.scenes]
+        tasks = [
+            self._generate_one(index, text, script.metadata.voice, output_dir)
+            for index, text in enumerate(script.subtitles)
+        ]
         paths = await asyncio.gather(*tasks)
-        return {scene.scene_id: path for scene, path in zip(script.scenes, paths)}
+        return {index: path for index, path in enumerate(paths)}
 
     def get_duration(self, audio_path: Path) -> float:
         """Return audio duration in seconds."""
         audio = AudioSegment.from_file(audio_path)
         return len(audio) / 1000.0
 
-    def apply_to_script(self, script: Script) -> None:
-        """Fill actual_duration for each scene based on generated audio."""
+    def apply_to_script(self, script: Script) -> dict[int, float]:
+        """Fill actual durations for each subtitle based on generated audio."""
         output_dir = Path(self.config.AUDIO_DIR)
-        for scene in script.scenes:
-            audio_path = output_dir / f"scene_{scene.scene_id}.mp3"
+        durations: dict[int, float] = {}
+        for index, _ in enumerate(script.subtitles):
+            audio_path = output_dir / f"subtitle_{index}.mp3"
             if audio_path.exists():
-                scene.actual_duration = self.get_duration(audio_path)
+                durations[index] = self.get_duration(audio_path)
             else:
-                logger.warning("Audio not found for scene %s", scene.scene_id)
-                scene.actual_duration = scene.duration_hint or 3.0
+                logger.warning("Audio not found for subtitle %s", index)
+                durations[index] = 3.0
+        script._subtitle_durations = durations  # type: ignore[attr-defined]
+        return durations
