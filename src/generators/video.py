@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,11 +11,18 @@ from typing import Any
 
 import httpx
 
-from .config import Config
-from .cost_tracker import CostTracker
-from .models import Metadata, Script, Shot
+from src.core.config import Config
+from src.core.models import Metadata, Script, Shot
+from src.cost.tracker import CostTracker
 
 logger = logging.getLogger(__name__)
+
+# Hardcoded Seedance generation settings. These cannot be overridden.
+VIDEO_MODEL = "doubao-seedance-1-0-pro-fast-251015"
+VIDEO_RESOLUTION = "720p"
+VIDEO_FPS = 12
+VIDEO_WATERMARK = False
+VIDEO_STYLE_PREFIX = "一拍二 逐帧手绘动画，每帧独立绘制，线条轻微抖动，蜡笔涂鸦质感"
 
 
 @dataclass
@@ -25,7 +31,7 @@ class VideoTaskResult:
     task_id: str | None = None
     video_url: str | None = None
     error: str | None = None
-    error_detail: dict | None = None
+    error_detail: dict[str, Any] | None = None
     status: str = "pending"
     usage: dict[str, Any] = field(default_factory=dict)
 
@@ -37,8 +43,20 @@ class VideoGenerationConfig:
     ratio: str = "16:9"
     duration: int | None = None
     resolution: str | None = None
+    frames: int | None = None
     watermark: bool = True
     seed: int | None = None
+
+
+def _nearest_valid_frames(target: int) -> int:
+    """Snap a target frame count to the nearest Seedance-legal value.
+
+    Seedance requires total frame count of the form ``25 + 4n`` within
+    ``[29, 289]``. We aim for ``VIDEO_FPS * duration`` frames to reach ~12 fps.
+    """
+    n = round((target - 25) / 4)
+    n = max(1, min(66, n))
+    return 25 + 4 * n
 
 
 def _image_to_data_url(image_path: Path) -> str:
@@ -54,27 +72,9 @@ class VideoGenerator:
     def __init__(self, config: Config, cost_tracker: CostTracker | None = None) -> None:
         self.config = config
         self.cost_tracker = cost_tracker
-        self.api_key = (
-            self.config.ARK_API_KEY
-            or ""
-        )
+        self.api_key = self.config.ARK_API_KEY or ""
         self.api_base = self.config.SEEDANCE_BASE_URL.rstrip("/")
         self.semaphore = asyncio.Semaphore(self.config.SEEDANCE_MAX_WORKERS)
-
-    async def _generate_one_with_limit(
-        self,
-        shot: Shot,
-        metadata: Metadata,
-        output_dir: Path,
-        start_frame_path: Path,
-        duration: int,
-        last_frame_path: Path | None = None,
-    ) -> Path:
-        """Generate a video clip with concurrency limit."""
-        async with self.semaphore:
-            return await self._generate_one(
-                shot, metadata, output_dir, start_frame_path, duration, last_frame_path
-            )
 
     def _get_headers(self) -> dict[str, str]:
         return {
@@ -106,14 +106,7 @@ class VideoGenerator:
             "content": self._build_content(prompt, config),
         }
 
-        optional_fields = [
-            "ratio",
-            "duration",
-            "resolution",
-            "seed",
-            "watermark",
-        ]
-        for field_name in optional_fields:
+        for field_name in ["ratio", "duration", "resolution", "frames", "seed", "watermark"]:
             value = getattr(config, field_name, None)
             if value is not None:
                 body[field_name] = value
@@ -129,7 +122,8 @@ class VideoGenerator:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(url, headers=self._get_headers(), json=body)
             response.raise_for_status()
-            return response.json()
+            data: dict[str, Any] = response.json()
+            return data
 
     async def _get_task_status(self, task_id: str) -> dict[str, Any]:
         url = f"{self.api_base}/contents/generations/tasks/{task_id}"
@@ -137,7 +131,8 @@ class VideoGenerator:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(url, headers=self._get_headers())
             response.raise_for_status()
-            return response.json()
+            data: dict[str, Any] = response.json()
+            return data
 
     async def _poll_task(
         self,
@@ -192,6 +187,21 @@ class VideoGenerator:
             output_path.write_bytes(response.content)
         return output_path
 
+    async def _generate_one_with_limit(
+        self,
+        shot: Shot,
+        metadata: Metadata,
+        output_dir: Path,
+        start_frame_path: Path,
+        duration: int,
+        last_frame_path: Path | None = None,
+    ) -> Path:
+        """Generate a video clip with concurrency limit."""
+        async with self.semaphore:
+            return await self._generate_one(
+                shot, metadata, output_dir, start_frame_path, duration, last_frame_path
+            )
+
     async def _generate_one(
         self,
         shot: Shot,
@@ -207,42 +217,49 @@ class VideoGenerator:
             logger.info("Video already exists for shot %s", shot.shot_id)
             if self.cost_tracker:
                 self.cost_tracker.log_video_generation(
-                    model=metadata.video_model,
+                    model=VIDEO_MODEL,
                     ratio=metadata.aspect_ratio,
-                    resolution=metadata.video_resolution,
+                    resolution=VIDEO_RESOLUTION,
                     duration=duration,
                     usage={},
                     note=f"shot_id={shot.shot_id} (existing, estimated)",
                 )
             return output_path
 
-        model_name = metadata.video_model
-        ratio = metadata.aspect_ratio
-        resolution = metadata.video_resolution
-
         prompt = shot.video_motion_prompt
         if metadata.video_system_prompt:
-            prompt = f"{metadata.video_system_prompt}，{prompt}"
+            prompt = f"{metadata.video_system_prompt}，{VIDEO_STYLE_PREFIX}，{prompt}"
+        else:
+            prompt = f"{VIDEO_STYLE_PREFIX}，{prompt}"
 
+        frames = _nearest_valid_frames(VIDEO_FPS * duration)
         config = VideoGenerationConfig(
             first_frame=_image_to_data_url(start_frame_path),
-            last_frame=_image_to_data_url(last_frame_path) if last_frame_path else None,
-            ratio=ratio,
+            ratio=metadata.aspect_ratio,
             duration=duration,
-            resolution=resolution,
-            watermark=metadata.video_watermark,
+            resolution=VIDEO_RESOLUTION,
+            frames=frames,
+            watermark=VIDEO_WATERMARK,
         )
+        # NOTE: last_frame is disabled because the hardcoded cheapest model
+        # (doubao-seedance-1-0-pro-fast) does not support both first and last
+        # frames in the same request.
+        # NOTE: generate_audio is never sent -> silent video (the 1.0 series
+        # has no audio support anyway).
 
         logger.info(
-            "Generating video for shot %s (model=%s, ratio=%s, duration=%ss, resolution=%s)",
+            "Generating video for shot %s (model=%s, ratio=%s, duration=%ss, "
+            "resolution=%s, fps=%s, frames=%s)",
             shot.shot_id,
-            model_name,
-            ratio,
+            VIDEO_MODEL,
+            metadata.aspect_ratio,
             duration,
-            resolution,
+            VIDEO_RESOLUTION,
+            VIDEO_FPS,
+            frames,
         )
 
-        task_data = await self._create_task(prompt, config, model_name)
+        task_data = await self._create_task(prompt, config, VIDEO_MODEL)
         task_id = task_data.get("id")
         if not task_id:
             raise ValueError(f"Failed to create video task for shot {shot.shot_id}: {task_data}")
@@ -259,9 +276,9 @@ class VideoGenerator:
 
         if self.cost_tracker:
             self.cost_tracker.log_video_generation(
-                model=model_name,
-                ratio=ratio,
-                resolution=resolution,
+                model=VIDEO_MODEL,
+                ratio=metadata.aspect_ratio,
+                resolution=VIDEO_RESOLUTION,
                 duration=duration,
                 usage=result.usage,
                 note=f"shot_id={shot.shot_id}",
@@ -274,33 +291,27 @@ class VideoGenerator:
         script: Script,
         start_frame_map: dict[int, Path],
         shot_durations: dict[int, int],
-        last_frame_map: dict[int, Path] | None = None,
     ) -> dict[int, Path]:
-        """Generate video clips for all shots.
-
-        Args:
-            script: The script with shots.
-            start_frame_map: Mapping from shot_id to start-frame image path.
-            shot_durations: Mapping from shot_id to video duration in seconds.
-            last_frame_map: Optional mapping from shot_id to last-frame image path.
-        """
-        if not script.uses_shots:
-            return {}
-
+        """Generate video clips for all shots."""
         output_dir = Path(self.config.VIDEOS_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        last_frame_map = last_frame_map or {}
+        sorted_shots = sorted(script.shots, key=lambda s: s.shot_id)
+        next_frame_map: dict[int, Path | None] = {}
+        for idx, shot in enumerate(sorted_shots):
+            if idx + 1 < len(sorted_shots):
+                next_id = sorted_shots[idx + 1].shot_id
+                next_frame_map[shot.shot_id] = start_frame_map.get(next_id)
+            else:
+                next_frame_map[shot.shot_id] = None
 
         tasks = []
-        for shot in script.shots:
-            if shot.hold_video:
-                continue
+        for shot in sorted_shots:
             start_frame = start_frame_map.get(shot.shot_id)
             if not start_frame or not start_frame.exists():
                 raise FileNotFoundError(f"Start frame not found for shot {shot.shot_id}")
             duration = shot_durations.get(shot.shot_id, 5)
-            last_frame = last_frame_map.get(shot.shot_id)
+            last_frame = next_frame_map.get(shot.shot_id)
             tasks.append(
                 self._generate_one_with_limit(
                     shot, script.metadata, output_dir, start_frame, duration, last_frame
@@ -310,23 +321,10 @@ class VideoGenerator:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         video_map: dict[int, Path] = {}
-        for shot, result in zip(script.shots, results):
-            if isinstance(result, Exception):
+        for shot, result in zip(sorted_shots, results):
+            if isinstance(result, BaseException):
                 logger.error("Failed to generate video for shot %s: %s", shot.shot_id, result)
                 raise result
             video_map[shot.shot_id] = result
-
-        # Handle hold_video shots
-        for shot in script.shots:
-            if shot.hold_video:
-                prev_path = video_map.get(shot.shot_id - 1)
-                if prev_path and prev_path.exists():
-                    video_map[shot.shot_id] = prev_path
-                    logger.info("Shot %s holds video from shot %s", shot.shot_id, shot.shot_id - 1)
-                else:
-                    logger.warning(
-                        "Could not hold video for shot %s, previous video not found",
-                        shot.shot_id,
-                    )
 
         return video_map

@@ -23,8 +23,12 @@ class Config:
     )
     SEEDREAM_MAX_WORKERS: int = int(os.getenv("SEEDREAM_MAX_WORKERS", "32"))
 
-    # Seedance video generation
-    SEEDANCE_MODEL: str = os.getenv("SEEDANCE_MODEL", "doubao-seedance-1-0-pro-250528")
+    # Seedance video generation - hardcoded to cheapest 720p silent config.
+    # These values cannot be overridden by environment variables or script.json.
+    SEEDANCE_MODEL: str = "doubao-seedance-1-0-pro-fast-251015"
+    SEEDANCE_RESOLUTION: str = "720p"
+    SEEDANCE_FPS: int = 12
+    SEEDANCE_WATERMARK: bool = False
     SEEDANCE_BASE_URL: str = os.getenv(
         "SEEDANCE_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3"
     )
@@ -33,12 +37,10 @@ class Config:
     # TTS
     TTS_PROVIDER: str = os.getenv("TTS_PROVIDER", "edge_tts")
     TTS_VOICE: str = os.getenv("TTS_VOICE", "zh-CN-YunjianNeural")
-    TTS_SPEED: float = float(os.getenv("TTS_SPEED", "1.2"))
+    TTS_SPEED: float = float(os.getenv("TTS_SPEED", "1.0"))
 
     # Volcano TTS (Doubao / Seed-TTS)
-    # New BytePlus Speech Console uses a single API key.
     VOLCANO_TTS_API_KEY: str = os.getenv("VOLCANO_TTS_API_KEY", "")
-    # Legacy Speech Console uses App ID + Access Token + Cluster.
     VOLCANO_TTS_APP_ID: str = os.getenv("VOLCANO_TTS_APP_ID", "")
     VOLCANO_TTS_ACCESS_TOKEN: str = os.getenv("VOLCANO_TTS_ACCESS_TOKEN", "")
     VOLCANO_TTS_CLUSTER: str = os.getenv("VOLCANO_TTS_CLUSTER", "volcano_tts")

@@ -1,11 +1,11 @@
-"""Subtitle generation based on scene durations."""
+"""Subtitle generation based on subtitle durations."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from .config import Config
-from .models import Scene, Script
+from src.core.config import Config
+from src.core.models import Script, Subtitle
 
 
 def _format_srt_time(seconds: float) -> str:
@@ -22,28 +22,30 @@ class SubtitleGenerator:
     """Generate SRT subtitle files."""
 
     def __init__(self, config: Config | None = None) -> None:
-        self.config = config or Config
+        self.config = config
 
-    def _scene_to_entry(self, index: int, scene: Scene, start: float, end: float) -> str:
+    def _subtitle_to_entry(self, index: int, subtitle: Subtitle, start: float, end: float) -> str:
         """Create a single SRT entry."""
         return (
             f"{index}\n"
             f"{_format_srt_time(start)} --> {_format_srt_time(end)}\n"
-            f"{scene.subtitle}\n"
+            f"{subtitle.text}\n"
         )
 
     def generate(self, script: Script, output_path: str | Path | None = None) -> Path:
-        """Generate SRT file from script scenes."""
+        """Generate SRT file from script subtitles."""
+        if self.config is None:
+            raise ValueError("Config is required for subtitle generation")
         output_path = Path(output_path or Path(self.config.SUBTITLES_DIR) / "caption.srt")
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         entries = []
         current_time = 0.0
-        for idx, scene in enumerate(script.scenes, start=1):
-            duration = scene.actual_duration or scene.duration_hint or 3.0
+        for idx, subtitle in enumerate(script.subtitles, start=1):
+            duration = subtitle.duration or 3.0
             start = current_time
             end = current_time + duration
-            entries.append(self._scene_to_entry(idx, scene, start, end))
+            entries.append(self._subtitle_to_entry(idx, subtitle, start, end))
             current_time = end
 
         output_path.write_text("\n".join(entries), encoding="utf-8")

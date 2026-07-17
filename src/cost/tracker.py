@@ -9,19 +9,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .config import Config
+from src.core.config import Config
 
 logger = logging.getLogger(__name__)
 
 # Seedream pricing in CNY per image.
-# <= 2.36 megapixels: 0.30 CNY
-# >  2.36 megapixels: 0.60 CNY
 MEGAPIXEL_THRESHOLD = 2.36
 PRICE_LOW_RES_CNY = 0.30
 PRICE_HIGH_RES_CNY = 0.60
 
-# Seedance token pricing in CNY per million tokens (online inference, silent/video generation).
-# Source: model-prices / 火山方舟官方文档
+# Seedance token pricing in CNY per million tokens.
 SEEDANCE_TOKENS_PER_MILLION_CNY: dict[str, float] = {
     "doubao-seedance-1-5-pro-251215": 8.0,
     "doubao-seedance-1-0-pro-250528": 15.0,
@@ -31,15 +28,17 @@ SEEDANCE_TOKENS_PER_MILLION_CNY: dict[str, float] = {
     "doubao-seedance-2-0-mini-260615": 23.0,
 }
 
-# Fallback per-second estimates for Seedance silent video (CNY/s) when token usage is missing.
-# Derived from official 5-second examples where available.
+# Fallback per-second estimates for Seedance silent video (CNY/s).
+# These are conservative estimates based on the token formula for 24fps.
 SEEDANCE_SILENT_CNY_PER_SECOND = {
     "480p": 0.40 / 5,
     "720p": 0.86 / 5,
     "1080p": 1.94 / 5,
 }
 
-# Approximate exchange rate for display purposes.
+# Estimate for the hardcoded cheapest model at 720p/12fps: ~0.045 CNY/s.
+SEEDANCE_FAST_720P_12FPS_CNY_PER_SECOND = 0.045
+
 USD_TO_CNY_RATE = 7.2
 
 
@@ -87,7 +86,6 @@ class CostTracker:
         unit_price = self._image_unit_price(width, height)
         calculated_cost = unit_price * quantity
 
-        # Try to extract actual cost from usage if provided
         if cost is None and usage:
             actual_cost = usage.get("cost") or usage.get("total_cost")
             if actual_cost is not None:
@@ -97,7 +95,6 @@ class CostTracker:
                     pass
 
         final_cost = cost if cost is not None else calculated_cost
-
         megapixels = (width * height) / 1_000_000
         entry = CostEntry(
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -129,7 +126,6 @@ class CostTracker:
         """Log cost for Seedance video generation."""
         usage = usage or {}
 
-        # Prefer actual token usage if API returns it
         completion_tokens = usage.get("completion_tokens") or usage.get("total_tokens")
         if completion_tokens is not None:
             try:
@@ -140,12 +136,12 @@ class CostTracker:
                 quantity = tokens
             except (ValueError, TypeError):
                 completion_tokens = None
-        else:
-            completion_tokens = None
 
         if completion_tokens is None:
-            # Fallback: estimate from resolution and duration
-            unit_price_for_entry = SEEDANCE_SILENT_CNY_PER_SECOND.get(resolution, 0.172)
+            if model == "doubao-seedance-1-0-pro-fast-251015" and resolution == "720p":
+                unit_price_for_entry = SEEDANCE_FAST_720P_12FPS_CNY_PER_SECOND
+            else:
+                unit_price_for_entry = SEEDANCE_SILENT_CNY_PER_SECOND.get(resolution, 0.172)
             cost = unit_price_for_entry * duration
             quantity = duration
 
@@ -213,11 +209,7 @@ class CostTracker:
         }
 
     def save(self) -> Path:
-        """Save cost entries and summary to project logs.
-
-        Merges with existing cost.json instead of overwriting, so that
-        costs from separate pipeline steps or re-runs are preserved.
-        """
+        """Save cost entries and summary to project logs."""
         output_path = Path(self.config.LOGS_DIR) / "cost.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -232,10 +224,7 @@ class CostTracker:
 
         new_entries = [asdict(entry) for entry in self.entries]
 
-        # Deduplicate by a stable key that ignores timestamp, so that
-        # re-running the same operation for the same shot replaces the
-        # previous entry rather than creating a duplicate.
-        def _entry_key(entry: dict[str, Any]) -> tuple:
+        def _entry_key(entry: dict[str, Any]) -> tuple[Any, ...]:
             return (
                 entry.get("operation"),
                 entry.get("model"),
@@ -243,14 +232,13 @@ class CostTracker:
                 entry.get("note"),
             )
 
-        merged: dict[tuple, dict[str, Any]] = {}
+        merged: dict[tuple[Any, ...], dict[str, Any]] = {}
         for entry in existing_entries + new_entries:
             merged[_entry_key(entry)] = entry
 
         merged_entries = list(merged.values())
         merged_entries.sort(key=lambda e: e.get("timestamp", ""))
 
-        # Recompute summary from merged entries
         by_operation: dict[str, float] = {}
         total_cny = 0.0
         for entry in merged_entries:
